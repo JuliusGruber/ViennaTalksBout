@@ -22,7 +22,7 @@ TalkBout is a real-time tag cloud that shows what topics people are posting, wri
 ### Time Slider
 
 - A **draggable time slider** covering the hours of the current day
-- As the user drags the slider, the tag cloud changes to reflect the activity at that point in time
+- As the user drags the slider, the tag cloud **morphs** to reflect the activity at that point in time — topics enter, grow, shrink, and disappear using the same lifecycle animations as the live tag cloud
 - The tag cloud also updates live when the slider is at the current time
 
 ### Data Sources (MVP)
