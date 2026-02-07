@@ -104,28 +104,25 @@ These community schemas are **not yet usable** for TalkBout's purposes:
 ### Custom Feed Generators
 
 - Bluesky's architecture allows anyone to build custom feed algorithms
-- A feed generator could implement keyword/NLP-based location filtering
-- This is essentially what TalkBout already plans to do at the ingestion layer
+- A feed generator could in theory implement keyword/NLP-based location filtering
+- However, content-based location inference is unreliable and does not meet TalkBout's requirement for geolocation filtering as a must-have
 
 ## Comparison With Other Platforms
 
 | Platform | Native Geo-Filtering | Notes |
 |----------|---------------------|-------|
 | X (Twitter) | Yes | Geo-tagged tweets + location search; requires Pro tier ($5k/mo) |
-| Mastodon | Partial | Instance-based locality (e.g. vienna.social); no per-post geo |
+| Mastodon | Partial | Instance-based locality (e.g. wien.rocks); no per-post geo |
 | Reddit | No | Subreddit-based locality (r/vienna); no geo coordinates |
-| **Bluesky** | **No** | No location data at any level; must infer from content |
+| **Bluesky** | **No** | No location data at any level; no structural locality mechanism |
 
 ## Conclusion for TalkBout
 
-**Nothing has changed for TalkBout's architecture.** The filtering strategy documented in `bluesky-data-delivery.md` remains correct:
+**The absence of native geolocation filtering is a significant limitation for Bluesky as a TalkBout data source.** Geolocation filtering — whether native (API-level geo parameters) or structural (instance-based locality, topic-specific communities) — is a must-have requirement for TalkBout data sources. Bluesky offers neither.
 
-1. Server-side Jetstream filter: `app.bsky.feed.post` only
-2. Language filter: `de` / `en`
-3. Keyword filter: Vienna-related terms
-4. LLM pass: Claude for topic extraction
+The community location schemas are worth monitoring, but they will not provide meaningful coverage anytime soon. Even once available, adoption would be opt-in and limited to specific apps — most posts would still lack location data.
 
-The community location schemas are worth monitoring for the future, but they will not provide meaningful coverage for passive Vienna-relevant post detection anytime soon. Even with full adoption, they would supplement — not replace — content-based filtering, since most users will never geo-tag their posts.
+Bluesky remains a candidate only if and when the `community.lexicon.location.*` schemas reach mainstream adoption, which is not on any near-term horizon.
 
 ## Sources
 

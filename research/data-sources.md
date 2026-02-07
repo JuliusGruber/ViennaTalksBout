@@ -10,8 +10,8 @@ Research into potential data sources for TalkBout — a real-time tag cloud show
 |----------|-----|-------------------|-------|
 | X (Twitter) | X API v2 | Filtered Stream endpoint | Geo-filtering for Vienna available; rate limits vary by access tier |
 | Reddit | Reddit API | Subreddit streaming via PRAW | r/vienna, r/austria — useful for local discussion threads |
-| Mastodon | Mastodon API | Streaming API built-in | vienna.social instance is a strong local source |
-| Bluesky | Bluesky AT Protocol | Firehose / Jetstream | Growing user base (~42M users); no native geo-filtering — community location schemas in development but not yet usable (see `research/bluesky-geolocation.md`) |
+| Mastodon | Mastodon API | Streaming API built-in | wien.rocks instance is a strong local source |
+| Bluesky | Bluesky AT Protocol | Firehose / Jetstream | Growing user base (~42M users); **no native geo-filtering and no structural locality** — does not meet the must-have geolocation filtering requirement. Community location schemas in development but not yet usable (see `research/bluesky-geolocation.md`) |
 
 ### Rate Limits by Platform
 
@@ -58,7 +58,7 @@ Source: [PRAW Rate Limits Docs](https://praw.readthedocs.io/en/stable/getting_st
 | Account creation | 5 req / 30 min | 30 min |
 
 - **Streaming API** (SSE/WebSocket) uses persistent connections and is **not subject to per-request rate limits** — ideal for real-time ingestion
-- Limits can vary per instance (vienna.social may differ from defaults)
+- Limits can vary per instance (wien.rocks may differ from defaults)
 - Mastodon.py supports three rate-limit modes: `throw`, `wait` (default), and `pace`
 - Limits refresh every 5 minutes
 
@@ -77,14 +77,14 @@ Source: [Mastodon Rate Limits Docs](https://docs.joinmastodon.org/api/rate-limit
 - Firehose: full binary stream of all network events; sustained **2,000+ events/sec** across network; ~232 GB/day at peak
 - **Jetstream** (recommended): lightweight JSON alternative; ~850 MB/day for all posts; zstd compression reduces by ~56%; 4 official public instances available; **no authentication required**
 - Jetstream data is **not self-authenticating** (no cryptographic signatures) — acceptable tradeoff for read-only ingestion
-- Geo-filtering must be done post-processing (no native geo support); community `community.lexicon.location.*` schemas are in development but not yet production-ready
+- **No geolocation filtering** at any level — no native geo support and no structural locality mechanism. Community `community.lexicon.location.*` schemas are in development but not yet production-ready. This means Bluesky does not meet TalkBout's must-have requirement for geolocation filtering
 
 Source: [Bluesky Rate Limits](https://docs.bsky.app/docs/advanced-guides/rate-limits), [Bluesky Firehose](https://docs.bsky.app/docs/advanced-guides/firehose), [Jetstream](https://github.com/bluesky-social/jetstream)
 
 ### Key Considerations (MVP)
 
 - **Rate limits**: See detailed breakdown above — X requires Pro tier ($5k/mo) for filtered streaming; Reddit and Mastodon have moderate limits suitable for polling; Bluesky Jetstream is the most permissive for real-time use
-- **Geo-filtering**: Not all platforms support native location filtering — may need LLM-based or heuristic filtering to isolate Vienna-related content
+- **Geo-filtering (must-have)**: Native geolocation filtering — or a structural equivalent (subreddit-based locality, instance-based locality, inherently regional content) — is a **must-have requirement** for any TalkBout data source. Platforms without a reliable mechanism to isolate Vienna-relevant content cannot be used. The LLM is used for topic extraction, not for geographic relevance filtering.
 - **Language**: Posts will be in German and English; the LLM extraction step must handle both
 - **Cost**: X API Pro tier ($5,000/mo) is the main cost driver; Reddit, Mastodon, and Bluesky APIs are free
 
@@ -98,9 +98,11 @@ Source: [Bluesky Rate Limits](https://docs.bsky.app/docs/advanced-guides/rate-li
 
 ### Local Forums & Community Platforms
 
-- **willhaben.at**: Marketplace activity can reflect local trends
-- **Vienna community forums**: Smaller niche forums and Facebook groups
-- **Nextdoor**: Neighborhood-level discussions
+- **willhaben.at**: Marketplace activity can reflect local trends (no public API; classified ads, not discussion content)
+- **Jodel**: Hyperlocal anonymous social app active in Vienna with ~10-20km geofence (no public API; explicit ToS prohibition on scraping; monitor for future API availability)
+- **derstandard.at comments**: Up to 30,000 comments/day (no public API; requires academic partnership)
+- **meinbezirk.at Wien**: Hyper-local news with 643k unique monthly users in Vienna (no standard RSS or API)
+- ~~**Nextdoor**: Not available in Austria (operates in 11 countries; Austria is not among them)~~
 
 ### Search & Trend Data
 
