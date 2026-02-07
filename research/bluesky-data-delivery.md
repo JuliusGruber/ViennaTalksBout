@@ -178,15 +178,15 @@ Indicates account status changes (active, deactivated, taken down). Low volume �
 
 ### What TalkBout Will Actually Process
 
-TalkBout does not need the full global post stream. After connecting with `wantedCollections=app.bsky.feed.post`, we apply a Vienna-relevance filter (keyword/LLM-based). Estimated funnel:
+TalkBout does not need the full global post stream. After connecting with `wantedCollections=app.bsky.feed.post`, posts can be filtered by language. However, **Bluesky has no native geolocation filtering** — there is no way to isolate Vienna-relevant posts at the API level, and no structural locality mechanism (unlike subreddit- or instance-based filtering on other platforms). Estimated funnel:
 
 | Stage | Events/Day (estimate) | Volume |
 |---|---|---|
 | All Bluesky posts | Millions | ~1–2 GB/day |
 | German-language posts (`langs` contains `de`) | ~2–5% of total | ~20–100 MB/day |
-| Vienna-relevant posts (keyword + LLM filter) | Tiny fraction | < 1 MB/day |
+| Vienna-relevant posts | No reliable filtering mechanism | Unknown |
 
-The ingestion bandwidth is small. The bottleneck for TalkBout is not data volume — it's the relevance filtering step.
+The ingestion bandwidth is small, but **the lack of geolocation filtering is a fundamental limitation**. Language filtering alone is insufficient to isolate Vienna-relevant content from all German-language posts worldwide.
 
 ### Message Sizes
 
@@ -213,8 +213,9 @@ Individual Jetstream messages are small:
 
 1. **Server-side (Jetstream):** Filter to `app.bsky.feed.post` only — eliminates likes, follows, blocks, etc.
 2. **Client-side pass 1:** Check `langs` field for `de` (German) or `en` (English) — cheap string check
-3. **Client-side pass 2:** Keyword filter for Vienna-related terms (Wien, Vienna, Austrian place names, etc.)
-4. **LLM pass:** Send surviving posts to Claude for topic extraction
+3. **LLM pass:** Send posts to Claude for topic extraction
+
+**Note:** This filtering pipeline lacks a geolocation filtering step. Bluesky has no native geo-filtering, and language filtering alone does not isolate Vienna-relevant content. See `research/bluesky-geolocation.md` for details on this limitation.
 
 ### Resilience
 
@@ -224,7 +225,7 @@ Individual Jetstream messages are small:
 
 ### Limitations to Plan For
 
-- **No geo-filtering:** Bluesky has no native location data. Vienna relevance must be inferred from content. Community-driven `community.lexicon.location.*` schemas are in development (funded by the AT Protocol Community Fund) but not yet in production or widely adopted. See `research/bluesky-geolocation.md` for details.
+- **No geo-filtering:** Bluesky has no native location data and no structural locality mechanism (unlike subreddit- or instance-based approaches on other platforms). Community-driven `community.lexicon.location.*` schemas are in development but not yet in production or widely adopted. This is a fundamental limitation for TalkBout, which requires geolocation filtering as a must-have for any data source. See `research/bluesky-geolocation.md` for details.
 - **Not self-authenticating:** Jetstream strips cryptographic proofs. Data could theoretically be tampered with by the Jetstream instance. Acceptable for TalkBout's use case.
 - **Not formally part of AT Protocol:** Bluesky operates Jetstream as a convenience service. They plan to eventually fold its advantages into the core protocol firehose, which could mean API changes.
 - **No SLA on public instances:** The 4 public instances are best-effort. For production reliability, consider running a private Jetstream instance (it's open source).
