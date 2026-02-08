@@ -53,9 +53,17 @@ TalkBout is a real-time tag cloud that shows what topics people are posting, wri
 
 - **Open and anonymous** — no login or user accounts required. Visit the site and see the tag cloud immediately.
 
+## Future Features
+
+### Post Drill-Down
+
+Hovering or clicking a tag in the tag cloud opens a list of the original posts associated with that topic. This allows users to explore the actual conversations behind each trending term.
+
+This feature requires **persisting posts in a database** (e.g. PostgreSQL) — the current MVP pipeline processes posts in-memory and discards them after topic extraction. To support drill-down, ingested posts would need to be stored with their extracted topic associations so they can be retrieved and displayed on demand.
+
 ## Non-Goals (MVP)
 
-- Clicking on tags to drill down into posts/comments
+- Post drill-down (see Future Features above)
 - Multiple color schemes or sentiment visualization
 - User accounts or personalization
 - Region/town selection (beyond Vienna)
