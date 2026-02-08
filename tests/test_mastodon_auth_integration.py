@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import pytest
+import requests
 
 from talkbout.config import MastodonConfig
-from talkbout.mastodon.auth import verify_instance
+from talkbout.mastodon.auth import verify_instance, REQUEST_TIMEOUT
 
 
 @pytest.mark.integration
@@ -26,3 +27,36 @@ class TestVerifyInstanceLive:
         assert info.uri, "uri should not be empty"
         assert info.title, "title should not be empty"
         assert info.version, "version should not be empty"
+
+
+@pytest.mark.integration
+class TestPublicTimelineLive:
+    """Fetch real posts from the wien.rocks public:local timeline."""
+
+    def test_receives_user_post_content(self):
+        url = "https://wien.rocks/api/v1/timelines/public"
+        params = {"local": "true", "limit": 5}
+
+        response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        posts = response.json()
+
+        assert isinstance(posts, list), "response should be a list"
+        assert len(posts) > 0, "should receive at least one post"
+
+        for post in posts:
+            # Every post must have an id and a created_at timestamp
+            assert post["id"], "post should have a non-empty id"
+            assert post["created_at"], "post should have a created_at timestamp"
+
+            # Content is HTML — it should be present on original posts
+            if post["reblog"] is None:
+                assert "content" in post, "original post should have a content field"
+
+            # Visibility must be public (we requested the public timeline)
+            assert post["visibility"] == "public"
+
+            # Account info should be present
+            account = post["account"]
+            assert account["id"], "account should have an id"
+            assert account["username"], "account should have a username"
