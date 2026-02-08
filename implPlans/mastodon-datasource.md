@@ -243,6 +243,14 @@ beautifulsoup4>=4.12.0
 python-dotenv>=1.0.0
 ```
 
+### Dev Dependencies
+
+```
+pytest>=8.0.0
+pytest-cov>=5.0.0
+pytest-asyncio>=0.23.0
+```
+
 ## Risk Mitigation
 
 | Risk | Impact | Mitigation |
@@ -260,3 +268,150 @@ python-dotenv>=1.0.0
 - Deployment / hosting infrastructure
 - User-facing API design
 - Multi-region support
+
+---
+
+## Plan Review: Inconsistencies & Missing Concepts
+
+The following issues were identified during a review of this implementation plan against the product spec (`specs/product-idea.md`) and the datasource analysis (`research/datasource-implementation-analysis.md`).
+
+### Inconsistencies
+
+1. **No testing strategy.** The plan defines 6 implementation phases but none mention writing tests. Every component (stream client, post buffer, topic extractor, topic store, integration) needs automated tests. See the [Test Coverage Requirement](#test-coverage-requirement) section below.
+
+2. **Thread safety not addressed.** Phase 2 uses `run_async=True` (spawns a background thread), and Phase 3 describes an in-memory buffer. The stream listener writes to the buffer from one thread while the timer reads and flushes it from another. The plan does not mention thread-safe access (locks, queues, or thread-safe data structures).
+
+3. **Topic matching is undefined.** Phase 5 says "Matching topics: update score, refresh `last_seen`" but never defines what "matching" means. The LLM may return `"U2 Störung"` in one batch and `"U2 Stoerung"` or `"U-Bahn Störung"` in the next. Without normalization or fuzzy matching, these would be treated as separate topics, fragmenting the tag cloud.
+
+4. **Lifecycle state transitions are incomplete.** Phase 5 defines four states (`entering`, `growing`, `shrinking`, `disappeared`) but does not specify transition rules:
+   - When does `entering` become `growing`? After N batches? After a score threshold?
+   - How many consecutive "not seen" batches before `shrinking` begins?
+   - When does `shrinking` become `disappeared`? After a time threshold? When score reaches zero?
+
+5. **"Active topics" definition is ambiguous.** Phase 5 says "Maintain a maximum of 20 active topics" but does not clarify whether `shrinking` topics count toward the 20. If they do, the visible cloud could be dominated by fading-out topics with few growing ones. If they don't, more than 20 topics might be visible simultaneously during transitions.
+
+6. **Sensitive post handling is undecided.** Phase 2 says "Optionally skip posts flagged as sensitive" — this should be a definitive design decision, not left optional, since it affects the kind of content that reaches the tag cloud.
+
+7. **The `public:local` stream may not require OAuth.** The Mastodon API documentation indicates that the `public` and `public:local` streaming endpoints are accessible without authentication. Phase 1 assumes OAuth is required for streaming, but it may only be needed for authenticated endpoints. This should be verified — if unauthenticated access works, Phase 1 simplifies significantly.
+
+### Missing Concepts
+
+8. **No Python package structure defined.** Phase 6 references `python -m talkbout.ingest` but the plan never defines the package layout (module names, directory structure, `__init__.py` files). This is needed before any code is written.
+
+9. **No datasource abstraction layer.** The datasource analysis (`datasource-implementation-analysis.md`) confirms Reddit as the second MVP source. The Mastodon implementation should define a common interface (e.g., `BaseDatasource` with `start()`, `stop()`, `on_batch()`) so that Reddit (and future sources) can plug in without refactoring the pipeline. This is absent from the plan.
+
+10. **No error handling / retry strategy for the Claude API.** Phase 4 says "Handle LLM errors/timeouts gracefully" but does not describe what happens when a call fails. Should it retry? How many times? What happens to the batch — is it dropped, re-queued, or merged into the next window? API rate limits from Anthropic are also not mentioned.
+
+11. **No input validation on Mastodon status objects.** Phase 2 lists fields to extract (`content`, `created_at`, `language`, `id`) but does not account for missing or malformed fields. Real-world SSE data can have `null` language codes, missing content, or unexpected structures.
+
+12. **Frontend API contract not defined.** Phase 5 says "Expose the current topic state for the frontend — API endpoint or in-memory state accessible to the web layer." While the frontend itself is out of scope, the backend must define *how* it exposes data (REST endpoint? WebSocket? file polling?). Without this, the topic store has no defined consumer interface.
+
+13. **No data retention / cleanup policy.** Phase 5 mentions persisting hourly snapshots as JSON files but does not specify how long they are kept. Without a cleanup policy, snapshot files accumulate indefinitely on disk.
+
+14. **Missing `html.parser` or `lxml` dependency.** BeautifulSoup4 requires a parser backend. The dependencies list includes `beautifulsoup4` but not the parser. If using the built-in `html.parser`, this should be documented explicitly. If using `lxml`, it must be added to the dependency list.
+
+15. **No graceful shutdown handling.** Phase 6 describes starting the pipeline but not stopping it. The plan should address signal handling (`SIGTERM`, `SIGINT`), flushing the current buffer before exit, and cleanly closing the SSE connection.
+
+---
+
+## Test Coverage Requirement
+
+**All code must be covered by tests.** No phase is considered complete until its components have corresponding automated tests. This applies to every module, function, and class introduced in the implementation.
+
+### Testing Principles
+
+- **Unit tests** for all individual functions and classes (stream listener, buffer, topic extractor, topic store, merging logic)
+- **Integration tests** for component interactions (stream → buffer → extractor → store pipeline)
+- **Mock external dependencies** — Mastodon SSE stream, Claude API, and file I/O must be mocked in tests so the test suite runs without network access or API keys
+- **Edge case coverage** — empty batches, malformed HTML, null fields, LLM returning invalid JSON, concurrent buffer access, etc.
+- **Test framework:** `pytest` (add to dependencies)
+- **Coverage target:** aim for ≥90% line coverage; all public functions must have at least one test
+
+### Test Dependencies (add to dev dependencies)
+
+```
+pytest>=8.0.0
+pytest-cov>=5.0.0
+pytest-asyncio>=0.23.0  # if async patterns are used
+```
+
+---
+
+## Implementation Checklist
+
+Check off each item as it is completed. A phase is only done when all its items — including tests — are checked.
+
+### Phase 1: OAuth Registration & Configuration
+
+- [ ] Register OAuth application on wien.rocks (`read:statuses` scope)
+- [ ] Verify whether `public:local` stream actually requires OAuth (see review item 7)
+- [ ] Store credentials in `.env` file (add `.env` to `.gitignore`)
+- [ ] Verify access by calling `GET /api/v1/instance`
+- [ ] Document the OAuth flow steps (authorization code exchange, token storage)
+- [ ] Write tests: config loading, credential validation, `.env` parsing
+
+### Phase 2: Stream Client (Ingestion)
+
+- [ ] Define Python package structure (`talkbout/` package, module layout)
+- [ ] Define a `BaseDatasource` abstract interface for future datasource reuse
+- [ ] Install `Mastodon.py` and `beautifulsoup4` (with explicit parser choice)
+- [ ] Implement `StreamListener` subclass with `on_update()` and `on_abort()`
+- [ ] Implement HTML-to-plain-text stripping
+- [ ] Implement post filtering (reblogs, empty content, sensitive — make a definitive decision)
+- [ ] Implement input validation for status fields (handle `null` language, missing content)
+- [ ] Write tests: listener callback handling, HTML stripping, post filtering, field validation
+- [ ] Write tests: mock SSE stream delivering sample statuses end-to-end
+
+### Phase 3: Post Buffer
+
+- [ ] Implement thread-safe in-memory buffer (use `queue.Queue` or `threading.Lock`)
+- [ ] Implement configurable time window with timer-based flush
+- [ ] Handle edge cases: empty batches (skip), oversized batches (cap)
+- [ ] Include batch metadata (window start/end, post count, source identifier)
+- [ ] Write tests: buffer accumulation, window expiry, empty window handling
+- [ ] Write tests: thread safety — concurrent writes and reads
+- [ ] Write tests: batch metadata correctness
+
+### Phase 4: Topic Extraction (LLM)
+
+- [ ] Design and document the extraction prompt (German-language handling, concrete topics)
+- [ ] Implement Claude API call using Anthropic Python SDK
+- [ ] Choose model (Haiku vs. Sonnet) and document the decision
+- [ ] Use structured output (tool use / JSON mode) instead of free-text JSON parsing
+- [ ] Implement response parsing and validation (valid JSON, non-empty topic list)
+- [ ] Implement error handling: retry logic (with backoff), behavior on repeated failures
+- [ ] Define what happens to a batch when the LLM call fails (drop / re-queue / merge)
+- [ ] Write tests: prompt construction with various batch inputs
+- [ ] Write tests: response parsing — valid JSON, malformed JSON, empty response
+- [ ] Write tests: retry logic and error handling (mock API failures, timeouts, rate limits)
+
+### Phase 5: Topic Store & State Management
+
+- [ ] Define topic data model (name, score, first_seen, last_seen, source, lifecycle state)
+- [ ] Implement topic matching strategy (define normalization / fuzzy matching approach)
+- [ ] Implement topic merging logic (new, updated, stale topics)
+- [ ] Define and implement lifecycle state transition rules with explicit thresholds
+- [ ] Clarify "active topics" definition — whether `shrinking` counts toward the 20 cap
+- [ ] Implement 20-topic cap with eviction of lowest-scoring topic
+- [ ] Implement hourly snapshot persistence (JSON files)
+- [ ] Implement snapshot retention / cleanup policy
+- [ ] Define the API contract for frontend consumption (REST, WebSocket, or other)
+- [ ] Write tests: topic merging — new topics, updated topics, stale topic decay
+- [ ] Write tests: lifecycle state transitions through all states
+- [ ] Write tests: 20-topic cap and eviction ordering
+- [ ] Write tests: snapshot persistence and loading
+- [ ] Write tests: snapshot cleanup policy
+
+### Phase 6: Integration & End-to-End Pipeline
+
+- [ ] Create main entry point (`python -m talkbout.ingest`)
+- [ ] Wire all components: stream → buffer → extractor → store
+- [ ] Implement configuration management (instance URL, credentials, buffer window, model, retention)
+- [ ] Implement structured logging (use Python `logging` module, define log format)
+- [ ] Implement health monitoring (last post timestamp, LLM success/failure rate)
+- [ ] Implement graceful shutdown (signal handling, buffer flush, SSE disconnect)
+- [ ] Write integration tests: full pipeline with mocked Mastodon stream and mocked Claude API
+- [ ] Write tests: configuration loading and validation
+- [ ] Write tests: health monitoring thresholds and alerts
+- [ ] Write tests: graceful shutdown flushes buffer and closes connections
+- [ ] Verify ≥90% test coverage across all modules (`pytest --cov`)
