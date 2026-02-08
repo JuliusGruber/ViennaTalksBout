@@ -341,14 +341,14 @@ pytest-asyncio>=0.23.0  # if async patterns are used
 
 Check off each item as it is completed. A phase is only done when all its items — including tests — are checked.
 
-### Phase 1: OAuth Registration & Configuration
+### Phase 1: OAuth Registration & Configuration ✓
 
-- [ ] Register OAuth application on wien.rocks (`read:statuses` scope)
-- [ ] Verify whether `public:local` stream actually requires OAuth (see review item 7)
-- [ ] Store credentials in `.env` file (add `.env` to `.gitignore`)
-- [ ] Verify access by calling `GET /api/v1/instance`
-- [ ] Document the OAuth flow steps (authorization code exchange, token storage)
-- [ ] Write tests: config loading, credential validation, `.env` parsing
+- [x] Register OAuth application on wien.rocks (`read:statuses` scope)
+- [x] Verify whether `public:local` stream actually requires OAuth (see review item 7)
+- [x] Store credentials in `.env` file (add `.env` to `.gitignore`)
+- [x] Verify access by calling `GET /api/v1/instance`
+- [x] Document the OAuth flow steps (authorization code exchange, token storage)
+- [x] Write tests: config loading, credential validation, `.env` parsing
 
 ### Phase 2: Stream Client (Ingestion)
 
