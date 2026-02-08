@@ -27,6 +27,9 @@ include = ["talkbout*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "integration: tests that make real HTTP calls to external services",
+]
 
 [tool.coverage.run]
 source = ["talkbout"]
