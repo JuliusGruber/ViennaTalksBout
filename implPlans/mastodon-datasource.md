@@ -385,22 +385,22 @@ Check off each item as it is completed. A phase is only done when all its items 
 - [x] Write tests: response parsing — valid JSON, malformed JSON, empty response
 - [x] Write tests: retry logic and error handling (mock API failures, timeouts, rate limits)
 
-### Phase 5: Topic Store & State Management
+### Phase 5: Topic Store & State Management ✓
 
-- [ ] Define topic data model (name, score, first_seen, last_seen, source, lifecycle state)
-- [ ] Implement topic matching strategy (define normalization / fuzzy matching approach)
-- [ ] Implement topic merging logic (new, updated, stale topics)
-- [ ] Define and implement lifecycle state transition rules with explicit thresholds
-- [ ] Clarify "active topics" definition — whether `shrinking` counts toward the 20 cap
-- [ ] Implement 20-topic cap with eviction of lowest-scoring topic
-- [ ] Implement hourly snapshot persistence (JSON files)
-- [ ] Implement snapshot retention / cleanup policy
-- [ ] Define the API contract for frontend consumption (REST, WebSocket, or other)
-- [ ] Write tests: topic merging — new topics, updated topics, stale topic decay
-- [ ] Write tests: lifecycle state transitions through all states
-- [ ] Write tests: 20-topic cap and eviction ordering
-- [ ] Write tests: snapshot persistence and loading
-- [ ] Write tests: snapshot cleanup policy
+- [x] Define topic data model (name, score, first_seen, last_seen, source, lifecycle state)
+- [x] Implement topic matching strategy (define normalization / fuzzy matching approach)
+- [x] Implement topic merging logic (new, updated, stale topics)
+- [x] Define and implement lifecycle state transition rules with explicit thresholds
+- [x] Clarify "active topics" definition — whether `shrinking` counts toward the 20 cap
+- [x] Implement 20-topic cap with eviction of lowest-scoring topic
+- [x] Implement hourly snapshot persistence (JSON files)
+- [x] Implement snapshot retention / cleanup policy
+- [x] Define the API contract for frontend consumption (REST, WebSocket, or other)
+- [x] Write tests: topic merging — new topics, updated topics, stale topic decay
+- [x] Write tests: lifecycle state transitions through all states
+- [x] Write tests: 20-topic cap and eviction ordering
+- [x] Write tests: snapshot persistence and loading
+- [x] Write tests: snapshot cleanup policy
 
 ### Phase 6: Integration & End-to-End Pipeline
 
