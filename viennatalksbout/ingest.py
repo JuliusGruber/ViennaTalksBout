@@ -1,10 +1,10 @@
-"""Ingestion pipeline orchestrator for TalkBout.
+"""Ingestion pipeline orchestrator for ViennaTalksBout.
 
 Wires all components into a running pipeline:
 
     Mastodon SSE stream → PostBuffer → TopicExtractor → TopicStore
 
-Run with ``python -m talkbout.ingest``.
+Run with ``python -m viennatalksbout.ingest``.
 """
 
 from __future__ import annotations
@@ -16,13 +16,13 @@ import threading
 from pathlib import Path
 from types import FrameType
 
-from talkbout.buffer import PostBatch, PostBuffer
-from talkbout.config import load_config, load_extractor_config
-from talkbout.datasource import Post
-from talkbout.extractor import TopicExtractor
-from talkbout.health import HealthMonitor
-from talkbout.mastodon.stream import MastodonDatasource
-from talkbout.store import TopicStore
+from viennatalksbout.buffer import PostBatch, PostBuffer
+from viennatalksbout.config import load_config, load_extractor_config
+from viennatalksbout.datasource import Post
+from viennatalksbout.extractor import TopicExtractor
+from viennatalksbout.health import HealthMonitor
+from viennatalksbout.mastodon.stream import MastodonDatasource
+from viennatalksbout.store import TopicStore
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ DEFAULT_HEALTH_LOG_INTERVAL = 300  # 5 minutes
 
 def setup_logging() -> None:
     """Configure structured logging for the pipeline."""
-    log_level = os.environ.get("TALKBOUT_LOG_LEVEL", "INFO").upper()
+    log_level = os.environ.get("VIENNATALKSBOUT_LOG_LEVEL", "INFO").upper()
     level = getattr(logging, log_level, logging.INFO)
     root = logging.getLogger()
     root.setLevel(level)
@@ -61,34 +61,34 @@ def load_pipeline_config() -> dict:
     return {
         "buffer_window_seconds": int(
             os.environ.get(
-                "TALKBOUT_BUFFER_WINDOW_SECONDS",
+                "VIENNATALKSBOUT_BUFFER_WINDOW_SECONDS",
                 str(DEFAULT_BUFFER_WINDOW_SECONDS),
             )
         ),
         "buffer_max_batch_size": int(
             os.environ.get(
-                "TALKBOUT_BUFFER_MAX_BATCH_SIZE",
+                "VIENNATALKSBOUT_BUFFER_MAX_BATCH_SIZE",
                 str(DEFAULT_BUFFER_MAX_BATCH_SIZE),
             )
         ),
         "snapshot_dir": os.environ.get(
-            "TALKBOUT_SNAPSHOT_DIR", DEFAULT_SNAPSHOT_DIR
+            "VIENNATALKSBOUT_SNAPSHOT_DIR", DEFAULT_SNAPSHOT_DIR
         ),
         "retention_hours": int(
             os.environ.get(
-                "TALKBOUT_RETENTION_HOURS",
+                "VIENNATALKSBOUT_RETENTION_HOURS",
                 str(DEFAULT_RETENTION_HOURS),
             )
         ),
         "stale_stream_seconds": float(
             os.environ.get(
-                "TALKBOUT_STALE_STREAM_SECONDS",
+                "VIENNATALKSBOUT_STALE_STREAM_SECONDS",
                 str(DEFAULT_STALE_STREAM_SECONDS),
             )
         ),
         "health_log_interval": float(
             os.environ.get(
-                "TALKBOUT_HEALTH_LOG_INTERVAL",
+                "VIENNATALKSBOUT_HEALTH_LOG_INTERVAL",
                 str(DEFAULT_HEALTH_LOG_INTERVAL),
             )
         ),
@@ -214,7 +214,7 @@ class IngestionPipeline:
         datasource, buffer, and health logging, then waits for the
         stop event.
         """
-        logger.info("Starting TalkBout ingestion pipeline")
+        logger.info("Starting ViennaTalksBout ingestion pipeline")
 
         # Install signal handlers
         self._original_sigint = signal.getsignal(signal.SIGINT)
@@ -357,7 +357,7 @@ def build_pipeline() -> IngestionPipeline:
 
 
 def main() -> None:
-    """Entry point for ``python -m talkbout.ingest``."""
+    """Entry point for ``python -m viennatalksbout.ingest``."""
     setup_logging()
 
     try:

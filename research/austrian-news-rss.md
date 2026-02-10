@@ -1,6 +1,6 @@
 # Austrian News Sites & RSS Feeds — Research
 
-Research into Austrian news websites and their RSS feeds as data sources for TalkBout.
+Research into Austrian news websites and their RSS feeds as data sources for ViennaTalksBout.
 
 Research date: 2026-02-07
 
@@ -284,7 +284,7 @@ RSS guide page: `https://www.vienna.at/features/rssanleitung`
 | API | `http://api.ots.at` — allows embedding OTS press releases |
 | Description | Austria's largest portal for multimedia press releases. ~900,000 visits/month |
 | Content type | Press releases from government, companies, organizations |
-| TalkBout value | High — press releases often break news before editorial coverage |
+| ViennaTalksBout value | High — press releases often break news before editorial coverage |
 
 #### oe24.at
 
@@ -299,14 +299,14 @@ RSS guide page: `https://www.vienna.at/features/rssanleitung`
 |--------|-------|
 | RSS Feed URL | `https://www.kleinezeitung.at/rss/hp_stmk` |
 | Description | Major regional newspaper (Styria/Carinthia focus). #3 most visited news site in Austria |
-| TalkBout value | Low for Vienna-specific content |
+| ViennaTalksBout value | Low for Vienna-specific content |
 
 #### Salzburger Nachrichten (sn.at)
 
 | Detail | Value |
 |--------|-------|
 | RSS Feed URL | `https://www.sn.at/xml/rss` |
-| TalkBout value | Low for Vienna-specific content (Salzburg focus) |
+| ViennaTalksBout value | Low for Vienna-specific content (Salzburg focus) |
 
 #### futurezone.at
 
@@ -314,7 +314,7 @@ RSS guide page: `https://www.vienna.at/features/rssanleitung`
 |--------|-------|
 | RSS Feed URL | `https://futurezone.at/xml/rss` |
 | Description | IT/tech channel (formerly part of ORF, now part of kurier.at) |
-| TalkBout value | Moderate — technology news with Austrian relevance |
+| ViennaTalksBout value | Moderate — technology news with Austrian relevance |
 
 #### meinbezirk.at (Regionalmedien Austria)
 
@@ -323,7 +323,7 @@ RSS guide page: `https://www.vienna.at/features/rssanleitung`
 | RSS Feed URL | Not available via standard RSS |
 | Description | Hyper-local news platform covering all 23 Vienna districts. 2.2M unique users/month, 33.6% national reach |
 | Access method | Proprietary newsfeed system, WhatsApp channels, no traditional RSS |
-| TalkBout value | Very high for Vienna-specific content, but technically difficult to ingest |
+| ViennaTalksBout value | Very high for Vienna-specific content, but technically difficult to ingest |
 
 #### wien.gv.at (City of Vienna)
 
@@ -331,7 +331,7 @@ RSS guide page: `https://www.vienna.at/features/rssanleitung`
 |--------|-------|
 | RSS Feed URL | Event database RSS: `http://www.wien.gv.at/vadb/internet/AdvPrSrv.asp?Layout=rss-vadb_neu&Type=R&...` |
 | Description | Official City of Vienna events database. Max 500 results per query |
-| TalkBout value | Moderate — events represent what's happening in Vienna |
+| ViennaTalksBout value | Moderate — events represent what's happening in Vienna |
 
 ---
 
@@ -424,7 +424,7 @@ Exact per-source article counts are not publicly reported. These estimates are b
 
 ### Comparison to Social Media Volume
 
-For context, the TalkBout social media data sources generate:
+For context, the ViennaTalksBout social media data sources generate:
 - Bluesky Jetstream: ~2,000+ events/sec across the entire network (filtering to Vienna yields a small fraction)
 - Mastodon wien.rocks: Smaller volume, but pre-filtered to Vienna
 - Reddit r/vienna: ~20-50 posts/day + comments
@@ -453,7 +453,7 @@ News RSS feeds would contribute **supplementary signal** — fewer items but eac
 1. Send `If-None-Match` (ETag) and `If-Modified-Since` headers on every request — returns HTTP 304 if unchanged, saving bandwidth
 2. Respect `Cache-Control` / `max-age` headers — do not poll before cache expires
 3. Honor `Retry-After` on HTTP 429 or 503 responses
-4. Set a descriptive `User-Agent` string (e.g., `TalkBout/1.0 +https://talkbout.at`)
+4. Set a descriptive `User-Agent` string (e.g., `ViennaTalksBout/1.0 +https://viennatalksbout.at`)
 5. Support gzip/deflate compression via `Accept-Encoding`
 6. Use adaptive polling — learn each feed's actual update pattern and adjust accordingly
 7. Respect `<ttl>` values in RSS feeds if present
@@ -494,7 +494,7 @@ News RSS feeds would contribute **supplementary signal** — fewer items but eac
 
 3. **JavaScript rendering:** Most Austrian news sites serve article content in the initial HTML (server-side rendered) for SEO purposes. Full JavaScript rendering (headless browser) is generally **not required** for article text extraction. However, interactive elements, comment sections, and some dynamic content may require JS.
 
-4. **Recommendation for TalkBout:** RSS summaries alone may be sufficient for topic extraction. The LLM can identify trending topics from headlines and short descriptions without needing full article text. This avoids the complexity and legal risk of full-page scraping. If deeper extraction is needed later, prioritize paywall-free sources (orf.at, vienna.at, heute.at, ots.at).
+4. **Recommendation for ViennaTalksBout:** RSS summaries alone may be sufficient for topic extraction. The LLM can identify trending topics from headlines and short descriptions without needing full article text. This avoids the complexity and legal risk of full-page scraping. If deeper extraction is needed later, prioritize paywall-free sources (orf.at, vienna.at, heute.at, ots.at).
 
 ### 5.4 Character Encoding
 
@@ -531,35 +531,35 @@ Austria has fully transposed Article 15 of the EU DSM Directive into national co
 | vienna.at | Free for non-commercial use | Available to readers for non-commercial purposes |
 | ots.at | Press releases are public | API available; press releases intended for wide distribution |
 
-### 6.3 Risk Assessment for TalkBout
+### 6.3 Risk Assessment for ViennaTalksBout
 
-**What TalkBout does with news content:**
+**What ViennaTalksBout does with news content:**
 - Ingests RSS feed summaries/headlines
 - Extracts trending topic keywords/phrases using an LLM
 - Displays topic names in a tag cloud (not article text or links)
 - Does not republish, display, or redistribute article content
 
 **Legal assessment:**
-- **Low risk for topic extraction from RSS:** TalkBout extracts *topics* (e.g., "Donauinselfest", "U2 Storung"), not article text. This is transformative use — the output (a tag cloud of topic names) bears no resemblance to the input (news articles).
+- **Low risk for topic extraction from RSS:** ViennaTalksBout extracts *topics* (e.g., "Donauinselfest", "U2 Storung"), not article text. This is transformative use — the output (a tag cloud of topic names) bears no resemblance to the input (news articles).
 - **RSS feeds are public and intended for machine consumption:** RSS is specifically designed for automated reading by software. Using RSS for automated processing aligns with its intended purpose.
-- **Article 15 likely does not apply:** TalkBout does not reproduce or make available press publications. It extracts abstract topic names. This is well below the threshold of "individual words and very short extracts."
+- **Article 15 likely does not apply:** ViennaTalksBout does not reproduce or make available press publications. It extracts abstract topic names. This is well below the threshold of "individual words and very short extracts."
 - **Respect robots.txt and ToS regardless:** Even if legally permissible, respecting publisher preferences maintains good relationships and avoids complaints.
 - **OTS press releases are safest:** Press releases from ots.at are explicitly intended for wide distribution and pose zero legal risk.
-- **Avoid displaying article text or full headlines:** If TalkBout ever adds a drill-down feature showing source articles, that would enter riskier legal territory and would need to link directly to the source (as per derstandard.at's terms).
+- **Avoid displaying article text or full headlines:** If ViennaTalksBout ever adds a drill-down feature showing source articles, that would enter riskier legal territory and would need to link directly to the source (as per derstandard.at's terms).
 
 ### 6.4 Practical Recommendations
 
 1. Use RSS feeds as intended — poll at reasonable intervals with proper caching headers
 2. Extract only topic keywords, not article text
 3. Do not store or display full article content
-4. Set a proper User-Agent identifying TalkBout
+4. Set a proper User-Agent identifying ViennaTalksBout
 5. Respect robots.txt directives
 6. If later adding source attribution/links, link directly to original articles per publisher terms
 7. Prioritize paywall-free, explicitly public sources (orf.at, vienna.at, ots.at) to minimize any legal friction
 
 ---
 
-## 7. Recommended Feed Set for TalkBout MVP
+## 7. Recommended Feed Set for ViennaTalksBout MVP
 
 ### Tier 1 — High Priority (Vienna-focused, free, confirmed feeds)
 

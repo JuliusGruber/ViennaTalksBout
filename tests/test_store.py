@@ -1,4 +1,4 @@
-"""Tests for talkbout.store — Topic store, lifecycle, merging, and snapshots."""
+"""Tests for viennatalksbout.store — Topic store, lifecycle, merging, and snapshots."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from talkbout.extractor import ExtractedTopic
-from talkbout.store import (
+from viennatalksbout.extractor import ExtractedTopic
+from viennatalksbout.store import (
     DEFAULT_DECAY_FACTOR,
     DEFAULT_MAX_ACTIVE,
     DEFAULT_MIN_SCORE,

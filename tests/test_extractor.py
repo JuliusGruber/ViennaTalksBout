@@ -1,4 +1,4 @@
-"""Tests for talkbout.extractor — topic extraction using Claude API."""
+"""Tests for viennatalksbout.extractor — topic extraction using Claude API."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ import anthropic
 import httpx
 import pytest
 
-from talkbout.buffer import PostBatch
-from talkbout.datasource import Post
-from talkbout.extractor import (
+from viennatalksbout.buffer import PostBatch
+from viennatalksbout.datasource import Post
+from viennatalksbout.extractor import (
     DEFAULT_MAX_RETRIES,
     DEFAULT_MODEL,
     EXTRACT_TOPICS_TOOL,
@@ -352,7 +352,7 @@ class TestParseToolResponse:
 # ===========================================================================
 
 
-@patch("talkbout.extractor.anthropic.Anthropic")
+@patch("viennatalksbout.extractor.anthropic.Anthropic")
 class TestTopicExtractorConfig:
     """Tests for TopicExtractor constructor and configuration."""
 
@@ -398,7 +398,7 @@ class TestTopicExtractorConfig:
 # ===========================================================================
 
 
-@patch("talkbout.extractor.anthropic.Anthropic")
+@patch("viennatalksbout.extractor.anthropic.Anthropic")
 class TestTopicExtractorExtract:
     """Tests for the extract method — happy path."""
 
@@ -516,8 +516,8 @@ class TestTopicExtractorExtract:
 # ===========================================================================
 
 
-@patch("talkbout.extractor.time.sleep")
-@patch("talkbout.extractor.anthropic.Anthropic")
+@patch("viennatalksbout.extractor.time.sleep")
+@patch("viennatalksbout.extractor.anthropic.Anthropic")
 class TestTopicExtractorRetry:
     """Tests for retry behavior on API errors."""
 
@@ -671,7 +671,7 @@ class TestTopicExtractorRetry:
 # ===========================================================================
 
 
-@patch("talkbout.extractor.anthropic.Anthropic")
+@patch("viennatalksbout.extractor.anthropic.Anthropic")
 class TestTopicExtractorParseResponse:
     """Tests for the _parse_response method."""
 

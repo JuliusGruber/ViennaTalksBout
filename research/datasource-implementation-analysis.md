@@ -14,12 +14,12 @@
 | **Cost** | Free |
 | **Data format** | Clean JSON, ~850 MB/day for all posts (~56% smaller with zstd compression) |
 | **Libraries needed** | Standard WebSocket client — no special SDK required |
-| **Geo-filtering** | **None** — no native geo support and no structural locality mechanism. Does not meet TalkBout's must-have geolocation filtering requirement |
+| **Geo-filtering** | **None** — no native geo support and no structural locality mechanism. Does not meet ViennaTalksBout's must-have geolocation filtering requirement |
 | **Data integrity** | Jetstream data is not self-authenticating (no cryptographic signatures) — acceptable for read-only ingestion |
 
 **Why it's technically simple:** Zero authentication, no SDK dependency, persistent WebSocket avoids rate-limit concerns, well-documented lightweight JSON format. Connect to a public instance and start receiving posts immediately.
 
-**⚠ Blocker:** Despite being the simplest to implement, Bluesky lacks any geolocation filtering — a must-have requirement for TalkBout data sources. There is no native geo support and no structural locality mechanism (unlike subreddit- or instance-based filtering). This makes Bluesky unsuitable as a TalkBout data source until the community location schemas reach mainstream adoption.
+**⚠ Blocker:** Despite being the simplest to implement, Bluesky lacks any geolocation filtering — a must-have requirement for ViennaTalksBout data sources. There is no native geo support and no structural locality mechanism (unlike subreddit- or instance-based filtering). This makes Bluesky unsuitable as a ViennaTalksBout data source until the community location schemas reach mainstream adoption.
 
 ---
 
@@ -103,7 +103,7 @@
 
 ## Decision
 
-**Mastodon (wien.rocks)** and **Reddit (r/wien + r/austria)** are the two data sources for the TalkBout MVP.
+**Mastodon (wien.rocks)** and **Reddit (r/wien + r/austria)** are the two data sources for the ViennaTalksBout MVP.
 
 | Source | Geo-Filtering | Real-Time | Volume | Cost | Implementation |
 |--------|--------------|-----------|--------|------|----------------|

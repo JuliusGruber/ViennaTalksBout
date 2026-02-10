@@ -1,10 +1,10 @@
 # Data Sources Research
 
-Research into potential data sources for TalkBout — a real-time tag cloud showing what Vienna is talking about.
+Research into potential data sources for ViennaTalksBout — a real-time tag cloud showing what Vienna is talking about.
 
 ## Decision: MVP Data Sources
 
-**Mastodon (wien.rocks)** and **Reddit (r/wien + r/austria)** are the two data sources for the TalkBout MVP.
+**Mastodon (wien.rocks)** and **Reddit (r/wien + r/austria)** are the two data sources for the ViennaTalksBout MVP.
 
 Both meet the must-have geolocation filtering requirement through structural locality — instance-based for Mastodon, subreddit-based for Reddit. Both are free, have mature Python libraries, and support real-time or near-real-time ingestion. Together they provide a dual-source pipeline with complementary strengths: Mastodon offers true push streaming with sub-second latency; Reddit offers higher volume and deeper discussion threads.
 
@@ -31,7 +31,7 @@ Access depends on paid tier — rate limits are per 15-minute window unless note
 |------|-------|-----------------|-----------------|--------|-------|
 | Free | $0 | 0 (write-only) | ❌ | ❌ | Not usable for ingestion |
 | Basic | $200/mo | 15,000 tweets | ❌ | Recent (7 days), 15 req/15 min | Insufficient for real-time |
-| Pro | $5,000/mo | 1,000,000 tweets | ✅ 1,000 rules, 250 posts/sec | Full-archive, 1 req/sec | Minimum viable tier for TalkBout |
+| Pro | $5,000/mo | 1,000,000 tweets | ✅ 1,000 rules, 250 posts/sec | Full-archive, 1 req/sec | Minimum viable tier for ViennaTalksBout |
 | Enterprise | Custom | Custom | ✅ | ✅ | Dedicated support |
 
 Key endpoint limits (Pro tier):
@@ -85,14 +85,14 @@ Source: [Mastodon Rate Limits Docs](https://docs.joinmastodon.org/api/rate-limit
 - Firehose: full binary stream of all network events; sustained **2,000+ events/sec** across network; ~232 GB/day at peak
 - **Jetstream** (recommended): lightweight JSON alternative; ~850 MB/day for all posts; zstd compression reduces by ~56%; 4 official public instances available; **no authentication required**
 - Jetstream data is **not self-authenticating** (no cryptographic signatures) — acceptable tradeoff for read-only ingestion
-- **No geolocation filtering** at any level — no native geo support and no structural locality mechanism. Community `community.lexicon.location.*` schemas are in development but not yet production-ready. This means Bluesky does not meet TalkBout's must-have requirement for geolocation filtering
+- **No geolocation filtering** at any level — no native geo support and no structural locality mechanism. Community `community.lexicon.location.*` schemas are in development but not yet production-ready. This means Bluesky does not meet ViennaTalksBout's must-have requirement for geolocation filtering
 
 Source: [Bluesky Rate Limits](https://docs.bsky.app/docs/advanced-guides/rate-limits), [Bluesky Firehose](https://docs.bsky.app/docs/advanced-guides/firehose), [Jetstream](https://github.com/bluesky-social/jetstream)
 
 ### Key Considerations (MVP)
 
 - **Rate limits**: See detailed breakdown above — X requires Pro tier ($5k/mo) for filtered streaming; Reddit and Mastodon have moderate limits suitable for polling; Bluesky Jetstream is the most permissive for real-time use
-- **Geo-filtering (must-have)**: Native geolocation filtering — or a structural equivalent (subreddit-based locality, instance-based locality, inherently regional content) — is a **must-have requirement** for any TalkBout data source. Platforms without a reliable mechanism to isolate Vienna-relevant content cannot be used. The LLM is used for topic extraction, not for geographic relevance filtering.
+- **Geo-filtering (must-have)**: Native geolocation filtering — or a structural equivalent (subreddit-based locality, instance-based locality, inherently regional content) — is a **must-have requirement** for any ViennaTalksBout data source. Platforms without a reliable mechanism to isolate Vienna-relevant content cannot be used. The LLM is used for topic extraction, not for geographic relevance filtering.
 - **Language**: Posts will be in German and English; the LLM extraction step must handle both
 - **Cost**: X API Pro tier ($5,000/mo) is the main cost driver; Reddit, Mastodon, and Bluesky APIs are free
 

@@ -1,4 +1,4 @@
-# Mastodon as a Data Source for TalkBout — In-Depth Research
+# Mastodon as a Data Source for ViennaTalksBout — In-Depth Research
 
 Research date: 2026-02-07
 
@@ -33,7 +33,7 @@ Operated by the **Fediverse Foundation** (Verein Fediverse Foundation), a nonpro
 - Primary language: **German (de)**
 - Registrations: open, no approval required, minimum age 14
 
-**Instance rules relevant to TalkBout:**
+**Instance rules relevant to ViennaTalksBout:**
 - Rule #4 bans "automated accounts, bots, or uncontextualized crossposting" — this governs user accounts on the instance, not external API consumers reading public data
 - Corporate/business accounts are restricted
 
@@ -59,7 +59,7 @@ The `public:local` stream from wien.rocks contains exclusively posts from wien.r
 - Not all wien.rocks posts are about Vienna — users post on any topic
 - Small volume: ~248 posts/day
 
-**Reliability assessment:** Instance-based filtering provides a useful geographic proxy with low false-positive rate but high false-negative rate. For an MVP, it is workable. This meets TalkBout's must-have requirement for geolocation filtering through **structural locality**.
+**Reliability assessment:** Instance-based filtering provides a useful geographic proxy with low false-positive rate but high false-negative rate. For an MVP, it is workable. This meets ViennaTalksBout's must-have requirement for geolocation filtering through **structural locality**.
 
 ---
 
@@ -75,7 +75,7 @@ Mastodon provides true real-time streaming via:
 
 | Stream | Description |
 |--------|-------------|
-| `public:local` | **Public posts from this server only** — the key stream for TalkBout |
+| `public:local` | **Public posts from this server only** — the key stream for ViennaTalksBout |
 | `public` | All public posts (federated) — too broad |
 | `hashtag:local` | Local posts with a specific hashtag |
 
@@ -137,11 +137,11 @@ mastodon.social explicitly bans automated data collection and AI training. Howev
 
 - Does not have explicit data usage terms beyond content moderation rules
 - The Fediverse Foundation does not appear to have published data usage policies
-- GDPR applies: TalkBout displays aggregated topics (not individual posts), which is likely covered by the **legitimate interest** basis
+- GDPR applies: ViennaTalksBout displays aggregated topics (not individual posts), which is likely covered by the **legitimate interest** basis
 
 ### Recommendations
 
-1. Contact the Fediverse Foundation (admin@fediverse.foundation) to inform them about TalkBout
+1. Contact the Fediverse Foundation (admin@fediverse.foundation) to inform them about ViennaTalksBout
 2. Never display individual posts or usernames — only aggregated topic terms
 3. Register a proper OAuth application with a descriptive name
 

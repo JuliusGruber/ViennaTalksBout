@@ -1,12 +1,12 @@
-"""Integration tests for talkbout.mastodon.auth — real calls to wien.rocks."""
+"""Integration tests for viennatalksbout.mastodon.auth — real calls to wien.rocks."""
 
 from __future__ import annotations
 
 import pytest
 import requests
 
-from talkbout.config import MastodonConfig
-from talkbout.mastodon.auth import verify_instance, REQUEST_TIMEOUT
+from viennatalksbout.config import MastodonConfig
+from viennatalksbout.mastodon.auth import verify_instance, REQUEST_TIMEOUT
 
 
 @pytest.mark.integration

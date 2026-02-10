@@ -1,4 +1,4 @@
-# Google Trends & Autocomplete as a Data Source for TalkBout — In-Depth Research
+# Google Trends & Autocomplete as a Data Source for ViennaTalksBout — In-Depth Research
 
 Research date: 2026-02-07
 
@@ -15,7 +15,7 @@ Google announced an **official Google Trends API (alpha)** on July 24, 2025.
 - **Authentication:** Google Cloud OAuth 2.0
 - **Features:** Interest over time (stable scaling), top trends, related queries, region/subregion breakdowns using ISO 3166-2 codes (`AT` for Austria, `AT-9` for Vienna)
 - **Data freshness:** Up to **2 days ago** — not truly real-time
-- **Cannot be used by TalkBout today** without alpha access approval
+- **Cannot be used by ViennaTalksBout today** without alpha access approval
 
 ### Unofficial Libraries
 
@@ -74,11 +74,11 @@ Unofficial endpoint: `https://suggestqueries.google.com/complete/search`
 
 ## 5. Legal / ToS
 
-Google's ToS **explicitly prohibit** automated scraping. The Google v. SerpApi lawsuit signals escalating enforcement. For TalkBout: low risk at small, non-commercial scale with respectful rate limiting; high technical risk due to endpoint instability.
+Google's ToS **explicitly prohibit** automated scraping. The Google v. SerpApi lawsuit signals escalating enforcement. For ViennaTalksBout: low risk at small, non-commercial scale with respectful rate limiting; high technical risk due to endpoint instability.
 
 ---
 
-## 6. Assessment for TalkBout
+## 6. Assessment for ViennaTalksBout
 
 | Criterion | Google Trends | Google Autocomplete |
 |-----------|--------------|-------------------|

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive script to register a TalkBout OAuth application on a Mastodon instance.
+"""Interactive script to register a ViennaTalksBout OAuth application on a Mastodon instance.
 
 Usage:
     python scripts/register_app.py [--instance INSTANCE_URL]
@@ -20,14 +20,14 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add the project root to the path so we can import talkbout
+# Add the project root to the path so we can import viennatalksbout
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from talkbout.mastodon.auth import register_app, get_authorization_url, exchange_code_for_token
+from viennatalksbout.mastodon.auth import register_app, get_authorization_url, exchange_code_for_token
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Register TalkBout on a Mastodon instance")
+    parser = argparse.ArgumentParser(description="Register ViennaTalksBout on a Mastodon instance")
     parser.add_argument(
         "--instance",
         default="https://wien.rocks",
@@ -36,7 +36,7 @@ def main() -> None:
     args = parser.parse_args()
     instance_url: str = args.instance
 
-    print(f"Registering TalkBout on {instance_url}...")
+    print(f"Registering ViennaTalksBout on {instance_url}...")
     print()
 
     try:

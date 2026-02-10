@@ -1,4 +1,4 @@
-"""Tests for talkbout.health — health monitoring."""
+"""Tests for viennatalksbout.health — health monitoring."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from talkbout.health import (
+from viennatalksbout.health import (
     DEFAULT_STALE_STREAM_SECONDS,
     HealthMonitor,
     HealthStatus,
@@ -229,7 +229,7 @@ class TestHealthMonitorCheckAndLog:
             monitor._last_post_time = time.monotonic() - 1.0
             monitor._posts_received = 1
         import logging
-        with caplog.at_level(logging.WARNING, logger="talkbout.health"):
+        with caplog.at_level(logging.WARNING, logger="viennatalksbout.health"):
             status = monitor.check_and_log()
         assert status.stream_stale is True
         assert "stale" in caplog.text.lower()

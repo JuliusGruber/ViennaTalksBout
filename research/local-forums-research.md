@@ -1,4 +1,4 @@
-# Local Forums & Community Platforms — In-Depth Research for TalkBout
+# Local Forums & Community Platforms — In-Depth Research for ViennaTalksBout
 
 Research date: 2026-02-07
 
@@ -8,7 +8,7 @@ Research date: 2026-02-07
 
 - **No public API.** Internal API exists (`api.willhaben.at`) but is undocumented and closed.
 - **Marketplace, not a forum.** 200,000 new classified ads/day, 20.8M monthly visits — but no discussion content, no comment sections, no community features. User interaction is strictly one-to-one buyer/seller chat.
-- **Verdict:** Low value for TalkBout. Wrong content type (listings, not conversations).
+- **Verdict:** Low value for ViennaTalksBout. Wrong content type (listings, not conversations).
 
 ---
 
@@ -32,7 +32,7 @@ Research date: 2026-02-07
 
 **ToS:** **Explicitly prohibit** automation and data extraction.
 
-**Verdict:** Content would be ideal for TalkBout (hyperlocal Vienna conversations), but **no public API, explicit ToS prohibition, extremely fragile unofficial tools, significant legal risk**. Monitor for future API availability.
+**Verdict:** Content would be ideal for ViennaTalksBout (hyperlocal Vienna conversations), but **no public API, explicit ToS prohibition, extremely fragile unofficial tools, significant legal risk**. Monitor for future API availability.
 
 ---
 
@@ -125,7 +125,7 @@ This category is **the hardest and riskiest** to implement, confirming the exist
 **Key actionable findings:**
 - **Nextdoor** removed from future data sources (not in Austria)
 - **Jodel** added as a "watch" item — the single most relevant hyperlocal platform, but currently inaccessible
-- None of these platforms meet TalkBout's must-have requirement for geolocation filtering via accessible APIs
+- None of these platforms meet ViennaTalksBout's must-have requirement for geolocation filtering via accessible APIs
 
 ## Sources
 

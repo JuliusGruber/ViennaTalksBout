@@ -1,4 +1,4 @@
-"""Tests for talkbout.mastodon.stream — stream listener, HTML stripping, filtering, validation."""
+"""Tests for viennatalksbout.mastodon.stream — stream listener, HTML stripping, filtering, validation."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from talkbout.datasource import BaseDatasource, Post
-from talkbout.mastodon.stream import (
-    TalkBoutStreamListener,
+from viennatalksbout.datasource import BaseDatasource, Post
+from viennatalksbout.mastodon.stream import (
+    ViennaTalksBoutStreamListener,
     filter_status,
     parse_status,
     strip_html,
@@ -291,16 +291,16 @@ class TestParseStatus:
 
 
 # ===========================================================================
-# TalkBoutStreamListener
+# ViennaTalksBoutStreamListener
 # ===========================================================================
 
 
-class TestTalkBoutStreamListener:
-    """Tests for TalkBoutStreamListener callback handling."""
+class TestViennaTalksBoutStreamListener:
+    """Tests for ViennaTalksBoutStreamListener callback handling."""
 
-    def _make_listener(self) -> tuple[TalkBoutStreamListener, MagicMock]:
+    def _make_listener(self) -> tuple[ViennaTalksBoutStreamListener, MagicMock]:
         callback = MagicMock()
-        listener = TalkBoutStreamListener(on_post=callback, source="mastodon:wien.rocks")
+        listener = ViennaTalksBoutStreamListener(on_post=callback, source="mastodon:wien.rocks")
         return listener, callback
 
     def test_valid_post_triggers_callback(self):
@@ -366,7 +366,7 @@ class TestTalkBoutStreamListener:
 
     def test_source_propagated_to_post(self):
         callback = MagicMock()
-        listener = TalkBoutStreamListener(on_post=callback, source="mastodon:custom.instance")
+        listener = ViennaTalksBoutStreamListener(on_post=callback, source="mastodon:custom.instance")
         listener.on_update(_make_status())
 
         post = callback.call_args[0][0]
@@ -393,19 +393,19 @@ class TestMastodonDatasource:
     """Tests for MastodonDatasource."""
 
     def test_source_id(self):
-        from talkbout.mastodon.stream import MastodonDatasource
+        from viennatalksbout.mastodon.stream import MastodonDatasource
 
         ds = MastodonDatasource("https://wien.rocks", "token")
         assert ds.source_id == "mastodon:wien.rocks"
 
     def test_source_id_strips_trailing_slash(self):
-        from talkbout.mastodon.stream import MastodonDatasource
+        from viennatalksbout.mastodon.stream import MastodonDatasource
 
         ds = MastodonDatasource("https://wien.rocks/", "token")
         assert ds.source_id == "mastodon:wien.rocks"
 
     def test_is_base_datasource(self):
-        from talkbout.mastodon.stream import MastodonDatasource
+        from viennatalksbout.mastodon.stream import MastodonDatasource
 
         ds = MastodonDatasource("https://wien.rocks", "token")
         assert isinstance(ds, BaseDatasource)

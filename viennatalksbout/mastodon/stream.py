@@ -1,4 +1,4 @@
-"""Mastodon streaming client for TalkBout.
+"""Mastodon streaming client for ViennaTalksBout.
 
 Connects to a Mastodon instance's public:local SSE stream, validates and
 filters incoming statuses, strips HTML to plain text, and emits normalized
@@ -15,7 +15,7 @@ from typing import Any, Callable
 from bs4 import BeautifulSoup
 from mastodon import Mastodon, StreamListener
 
-from talkbout.datasource import BaseDatasource, Post
+from viennatalksbout.datasource import BaseDatasource, Post
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ def parse_status(status: dict[str, Any], source: str) -> Post:
 # Stream listener
 # ---------------------------------------------------------------------------
 
-class TalkBoutStreamListener(StreamListener):
+class ViennaTalksBoutStreamListener(StreamListener):
     """Mastodon StreamListener that validates, filters, and emits Posts.
 
     Wired into Mastodon.py's SSE streaming. Each incoming status goes
@@ -226,7 +226,7 @@ class MastodonDatasource(BaseDatasource):
             access_token=self._access_token,
             api_base_url=self._instance_url,
         )
-        listener = TalkBoutStreamListener(on_post, self.source_id, on_error)
+        listener = ViennaTalksBoutStreamListener(on_post, self.source_id, on_error)
         self._handle = client.stream_public(
             listener,
             local=True,

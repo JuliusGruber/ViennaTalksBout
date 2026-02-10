@@ -1,4 +1,4 @@
-"""Tests for talkbout.mastodon.auth — OAuth registration and instance verification."""
+"""Tests for viennatalksbout.mastodon.auth — OAuth registration and instance verification."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import patch, MagicMock
 import pytest
 import requests
 
-from talkbout.config import MastodonConfig
-from talkbout.mastodon.auth import (
+from viennatalksbout.config import MastodonConfig
+from viennatalksbout.mastodon.auth import (
     OAuthApp,
     InstanceInfo,
     register_app,
@@ -36,14 +36,14 @@ def _make_config(**overrides: str) -> MastodonConfig:
 class TestRegisterApp:
     """Tests for register_app()."""
 
-    @patch("talkbout.mastodon.auth.requests.post")
+    @patch("viennatalksbout.mastodon.auth.requests.post")
     def test_successful_registration(self, mock_post: MagicMock):
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "client_id": "returned_client_id",
             "client_secret": "returned_client_secret",
             "id": "12345",
-            "name": "TalkBout",
+            "name": "ViennaTalksBout",
             "redirect_uri": OOB_REDIRECT_URI,
         }
         mock_response.raise_for_status = MagicMock()
@@ -58,10 +58,10 @@ class TestRegisterApp:
         mock_post.assert_called_once()
         call_args = mock_post.call_args
         assert call_args[0][0] == "https://wien.rocks/api/v1/apps"
-        assert call_args[1]["json"]["client_name"] == "TalkBout"
+        assert call_args[1]["json"]["client_name"] == "ViennaTalksBout"
         assert call_args[1]["json"]["scopes"] == DEFAULT_SCOPES
 
-    @patch("talkbout.mastodon.auth.requests.post")
+    @patch("viennatalksbout.mastodon.auth.requests.post")
     def test_registration_with_custom_params(self, mock_post: MagicMock):
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -75,15 +75,15 @@ class TestRegisterApp:
             "https://wien.rocks",
             app_name="CustomApp",
             scopes="read write",
-            website="https://talkbout.example.com",
+            website="https://viennatalksbout.example.com",
         )
 
         payload = mock_post.call_args[1]["json"]
         assert payload["client_name"] == "CustomApp"
         assert payload["scopes"] == "read write"
-        assert payload["website"] == "https://talkbout.example.com"
+        assert payload["website"] == "https://viennatalksbout.example.com"
 
-    @patch("talkbout.mastodon.auth.requests.post")
+    @patch("viennatalksbout.mastodon.auth.requests.post")
     def test_registration_strips_trailing_slash(self, mock_post: MagicMock):
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -97,7 +97,7 @@ class TestRegisterApp:
         assert app.instance_url == "https://wien.rocks"
         assert mock_post.call_args[0][0] == "https://wien.rocks/api/v1/apps"
 
-    @patch("talkbout.mastodon.auth.requests.post")
+    @patch("viennatalksbout.mastodon.auth.requests.post")
     def test_registration_http_error(self, mock_post: MagicMock):
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = requests.HTTPError("422 Unprocessable")
@@ -137,7 +137,7 @@ class TestGetAuthorizationUrl:
 class TestExchangeCodeForToken:
     """Tests for exchange_code_for_token()."""
 
-    @patch("talkbout.mastodon.auth.requests.post")
+    @patch("viennatalksbout.mastodon.auth.requests.post")
     def test_successful_exchange(self, mock_post: MagicMock):
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -167,7 +167,7 @@ class TestExchangeCodeForToken:
         assert payload["grant_type"] == "authorization_code"
         assert payload["redirect_uri"] == OOB_REDIRECT_URI
 
-    @patch("talkbout.mastodon.auth.requests.post")
+    @patch("viennatalksbout.mastodon.auth.requests.post")
     def test_exchange_http_error(self, mock_post: MagicMock):
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = requests.HTTPError("401 Unauthorized")
@@ -185,7 +185,7 @@ class TestExchangeCodeForToken:
 class TestVerifyInstance:
     """Tests for verify_instance()."""
 
-    @patch("talkbout.mastodon.auth.requests.get")
+    @patch("viennatalksbout.mastodon.auth.requests.get")
     def test_successful_verification(self, mock_get: MagicMock):
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -211,7 +211,7 @@ class TestVerifyInstance:
         assert call_args[0][0] == "https://wien.rocks/api/v1/instance"
         assert "Bearer test_access_token" in call_args[1]["headers"]["Authorization"]
 
-    @patch("talkbout.mastodon.auth.requests.get")
+    @patch("viennatalksbout.mastodon.auth.requests.get")
     def test_uses_full_description_as_fallback(self, mock_get: MagicMock):
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -227,7 +227,7 @@ class TestVerifyInstance:
         info = verify_instance(config)
         assert info.description == "Fallback description"
 
-    @patch("talkbout.mastodon.auth.requests.get")
+    @patch("viennatalksbout.mastodon.auth.requests.get")
     def test_handles_missing_fields(self, mock_get: MagicMock):
         mock_response = MagicMock()
         mock_response.json.return_value = {}
@@ -241,7 +241,7 @@ class TestVerifyInstance:
         assert info.version == ""
         assert info.description == ""
 
-    @patch("talkbout.mastodon.auth.requests.get")
+    @patch("viennatalksbout.mastodon.auth.requests.get")
     def test_verify_instance_http_error(self, mock_get: MagicMock):
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = requests.HTTPError("503 Service Unavailable")
@@ -251,7 +251,7 @@ class TestVerifyInstance:
         with pytest.raises(requests.HTTPError):
             verify_instance(config)
 
-    @patch("talkbout.mastodon.auth.requests.get")
+    @patch("viennatalksbout.mastodon.auth.requests.get")
     def test_strips_trailing_slash_from_url(self, mock_get: MagicMock):
         mock_response = MagicMock()
         mock_response.json.return_value = {"uri": "x", "title": "x", "version": "x"}
@@ -266,10 +266,10 @@ class TestVerifyInstance:
 class TestVerifyCredentials:
     """Tests for verify_credentials()."""
 
-    @patch("talkbout.mastodon.auth.requests.get")
+    @patch("viennatalksbout.mastodon.auth.requests.get")
     def test_valid_credentials(self, mock_get: MagicMock):
         mock_response = MagicMock()
-        mock_response.json.return_value = {"name": "TalkBout", "vapid_key": "..."}
+        mock_response.json.return_value = {"name": "ViennaTalksBout", "vapid_key": "..."}
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
@@ -279,7 +279,7 @@ class TestVerifyCredentials:
         call_args = mock_get.call_args
         assert call_args[0][0] == "https://wien.rocks/api/v1/apps/verify_credentials"
 
-    @patch("talkbout.mastodon.auth.requests.get")
+    @patch("viennatalksbout.mastodon.auth.requests.get")
     def test_invalid_credentials(self, mock_get: MagicMock):
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = requests.HTTPError("401 Unauthorized")

@@ -40,7 +40,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 
-from talkbout.extractor import ExtractedTopic
+from viennatalksbout.extractor import ExtractedTopic
 
 logger = logging.getLogger(__name__)
 

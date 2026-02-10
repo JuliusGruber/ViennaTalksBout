@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implement the first TalkBout datasource — a real-time ingestion pipeline that streams public posts from the **wien.rocks** Mastodon instance, extracts trending topics using Claude, and feeds them into the tag cloud.
+Implement the first ViennaTalksBout datasource — a real-time ingestion pipeline that streams public posts from the **wien.rocks** Mastodon instance, extracts trending topics using Claude, and feeds them into the tag cloud.
 
 **Why Mastodon first:** Easiest viable datasource to implement. True real-time push streaming (SSE), no polling needed. Free, mature Python library (Mastodon.py), and instance-based locality eliminates the need for geo-filtering logic.
 
@@ -50,7 +50,7 @@ wien.rocks SSE stream
 
 1. Register an OAuth application on wien.rocks
    - Navigate to `https://wien.rocks/settings/applications/new`
-   - App name: `TalkBout` (or similar descriptive name)
+   - App name: `ViennaTalksBout` (or similar descriptive name)
    - Scopes needed: `read` (specifically `read:statuses`)
    - Redirect URI: `urn:ietf:wg:oauth:2.0:oob` (for local dev)
 2. Store credentials securely
@@ -219,7 +219,7 @@ Return JSON: [{"topic": "...", "score": 0.0-1.0, "count": N}, ...]
    - Track time since last received post (detect stale connections)
    - Track LLM call success/failure rate
 
-**Deliverable:** A single command (`python -m talkbout.ingest`) that starts the full Mastodon ingestion pipeline.
+**Deliverable:** A single command (`python -m viennatalksbout.ingest`) that starts the full Mastodon ingestion pipeline.
 
 ---
 
@@ -296,7 +296,7 @@ The following issues were identified during a review of this implementation plan
 
 ### Missing Concepts
 
-8. **No Python package structure defined.** Phase 6 references `python -m talkbout.ingest` but the plan never defines the package layout (module names, directory structure, `__init__.py` files). This is needed before any code is written.
+8. **No Python package structure defined.** Phase 6 references `python -m viennatalksbout.ingest` but the plan never defines the package layout (module names, directory structure, `__init__.py` files). This is needed before any code is written.
 
 9. **No datasource abstraction layer.** The datasource analysis (`datasource-implementation-analysis.md`) confirms Reddit as the second MVP source. The Mastodon implementation should define a common interface (e.g., `BaseDatasource` with `start()`, `stop()`, `on_batch()`) so that Reddit (and future sources) can plug in without refactoring the pipeline. This is absent from the plan.
 
@@ -352,7 +352,7 @@ Check off each item as it is completed. A phase is only done when all its items 
 
 ### Phase 2: Stream Client (Ingestion) ✓
 
-- [x] Define Python package structure (`talkbout/` package, module layout)
+- [x] Define Python package structure (`viennatalksbout/` package, module layout)
 - [x] Define a `BaseDatasource` abstract interface for future datasource reuse
 - [x] Install `Mastodon.py` and `beautifulsoup4` (with explicit parser choice)
 - [x] Implement `StreamListener` subclass with `on_update()` and `on_abort()`
@@ -404,7 +404,7 @@ Check off each item as it is completed. A phase is only done when all its items 
 
 ### Phase 6: Integration & End-to-End Pipeline ✓
 
-- [x] Create main entry point (`python -m talkbout.ingest`)
+- [x] Create main entry point (`python -m viennatalksbout.ingest`)
 - [x] Wire all components: stream → buffer → extractor → store
 - [x] Implement configuration management (instance URL, credentials, buffer window, model, retention)
 - [x] Implement structured logging (use Python `logging` module, define log format)

@@ -23,7 +23,7 @@ from typing import Any
 
 import anthropic
 
-from talkbout.buffer import PostBatch
+from viennatalksbout.buffer import PostBatch
 
 logger = logging.getLogger(__name__)
 

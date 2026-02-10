@@ -13,10 +13,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from talkbout.datasource import Post
-from talkbout.mastodon.stream import (
+from viennatalksbout.datasource import Post
+from viennatalksbout.mastodon.stream import (
     MastodonDatasource,
-    TalkBoutStreamListener,
+    ViennaTalksBoutStreamListener,
 )
 
 
@@ -129,7 +129,7 @@ class TestMockStreamEndToEnd:
     def test_full_stream_of_sample_statuses(self):
         """Feed all sample statuses through the listener and verify output."""
         received: list[Post] = []
-        listener = TalkBoutStreamListener(
+        listener = ViennaTalksBoutStreamListener(
             on_post=received.append,
             source="mastodon:wien.rocks",
         )
@@ -156,7 +156,7 @@ class TestMockStreamEndToEnd:
     def test_html_stripped_in_full_pipeline(self):
         """Verify HTML is properly stripped through the full pipeline."""
         received: list[Post] = []
-        listener = TalkBoutStreamListener(
+        listener = ViennaTalksBoutStreamListener(
             on_post=received.append,
             source="mastodon:wien.rocks",
         )
@@ -172,7 +172,7 @@ class TestMockStreamEndToEnd:
     def test_hashtags_preserved_as_text(self):
         """Hashtag links should become plain text like '#U2'."""
         received: list[Post] = []
-        listener = TalkBoutStreamListener(
+        listener = ViennaTalksBoutStreamListener(
             on_post=received.append,
             source="mastodon:wien.rocks",
         )
@@ -186,7 +186,7 @@ class TestMockStreamEndToEnd:
     def test_source_consistent_across_all_posts(self):
         """All posts from one listener should have the same source."""
         received: list[Post] = []
-        listener = TalkBoutStreamListener(
+        listener = ViennaTalksBoutStreamListener(
             on_post=received.append,
             source="mastodon:wien.rocks",
         )
@@ -200,7 +200,7 @@ class TestMockStreamEndToEnd:
     def test_null_language_handled(self):
         """Posts with null language should come through with language=None."""
         received: list[Post] = []
-        listener = TalkBoutStreamListener(
+        listener = ViennaTalksBoutStreamListener(
             on_post=received.append,
             source="mastodon:wien.rocks",
         )
@@ -213,7 +213,7 @@ class TestMockStreamEndToEnd:
     def test_iso_string_timestamps_parsed(self):
         """ISO 8601 string timestamps should be parsed correctly."""
         received: list[Post] = []
-        listener = TalkBoutStreamListener(
+        listener = ViennaTalksBoutStreamListener(
             on_post=received.append,
             source="mastodon:wien.rocks",
         )
@@ -229,7 +229,7 @@ class TestMockStreamEndToEnd:
     def test_datetime_timestamps_preserved(self):
         """datetime objects from Mastodon.py should pass through unchanged."""
         received: list[Post] = []
-        listener = TalkBoutStreamListener(
+        listener = ViennaTalksBoutStreamListener(
             on_post=received.append,
             source="mastodon:wien.rocks",
         )
@@ -244,7 +244,7 @@ class TestMockStreamEndToEnd:
     def test_stream_with_interleaved_invalid_statuses(self):
         """The stream should handle a mix of valid, invalid, and filtered statuses."""
         received: list[Post] = []
-        listener = TalkBoutStreamListener(
+        listener = ViennaTalksBoutStreamListener(
             on_post=received.append,
             source="mastodon:wien.rocks",
         )
@@ -272,7 +272,7 @@ class TestMockStreamEndToEnd:
         def exploding_callback(post: Post) -> None:
             raise RuntimeError("callback exploded")
 
-        listener = TalkBoutStreamListener(
+        listener = ViennaTalksBoutStreamListener(
             on_post=exploding_callback,
             source="mastodon:wien.rocks",
         )
@@ -285,7 +285,7 @@ class TestMockStreamEndToEnd:
 class TestMastodonDatasourceStartStop:
     """Tests for MastodonDatasource.start() and stop() with mocked Mastodon.py."""
 
-    @patch("talkbout.mastodon.stream.Mastodon")
+    @patch("viennatalksbout.mastodon.stream.Mastodon")
     def test_start_creates_stream(self, MockMastodon: MagicMock):
         mock_client = MagicMock()
         mock_handle = MagicMock()
@@ -305,7 +305,7 @@ class TestMastodonDatasourceStartStop:
         assert call_kwargs[1]["run_async"] is True
         assert call_kwargs[1]["reconnect_async"] is True
 
-    @patch("talkbout.mastodon.stream.Mastodon")
+    @patch("viennatalksbout.mastodon.stream.Mastodon")
     def test_stop_closes_handle(self, MockMastodon: MagicMock):
         mock_client = MagicMock()
         mock_handle = MagicMock()
@@ -318,12 +318,12 @@ class TestMastodonDatasourceStartStop:
 
         mock_handle.close.assert_called_once()
 
-    @patch("talkbout.mastodon.stream.Mastodon")
+    @patch("viennatalksbout.mastodon.stream.Mastodon")
     def test_stop_without_start_is_safe(self, MockMastodon: MagicMock):
         ds = MastodonDatasource("https://wien.rocks", "test_token")
         ds.stop()  # Should not raise
 
-    @patch("talkbout.mastodon.stream.Mastodon")
+    @patch("viennatalksbout.mastodon.stream.Mastodon")
     def test_double_stop_is_safe(self, MockMastodon: MagicMock):
         mock_client = MagicMock()
         mock_handle = MagicMock()
@@ -337,7 +337,7 @@ class TestMastodonDatasourceStartStop:
 
         mock_handle.close.assert_called_once()
 
-    @patch("talkbout.mastodon.stream.Mastodon")
+    @patch("viennatalksbout.mastodon.stream.Mastodon")
     def test_stream_delivers_posts_through_listener(self, MockMastodon: MagicMock):
         """Simulate Mastodon.py calling the listener from the stream."""
         captured_listener = None

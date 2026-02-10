@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import requests
 
-from talkbout.config import MastodonConfig
+from viennatalksbout.config import MastodonConfig
 
 # Redirect URI for local/CLI OAuth flow (out-of-band)
 OOB_REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
@@ -46,7 +46,7 @@ class InstanceInfo:
 
 def register_app(
     instance_url: str,
-    app_name: str = "TalkBout",
+    app_name: str = "ViennaTalksBout",
     scopes: str = DEFAULT_SCOPES,
     redirect_uri: str = OOB_REDIRECT_URI,
     website: str | None = None,

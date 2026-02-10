@@ -1,4 +1,4 @@
-"""Configuration loading and validation for TalkBout.
+"""Configuration loading and validation for ViennaTalksBout.
 
 Loads settings from environment variables (with optional .env file support).
 """

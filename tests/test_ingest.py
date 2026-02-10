@@ -1,4 +1,4 @@
-"""Tests for talkbout.ingest — ingestion pipeline orchestrator.
+"""Tests for viennatalksbout.ingest — ingestion pipeline orchestrator.
 
 Integration tests with mocked external dependencies (Mastodon stream,
 Claude API). Tests cover:
@@ -22,11 +22,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from talkbout.buffer import PostBatch, PostBuffer
-from talkbout.datasource import Post
-from talkbout.extractor import ExtractedTopic, TopicExtractor
-from talkbout.health import HealthMonitor
-from talkbout.ingest import (
+from viennatalksbout.buffer import PostBatch, PostBuffer
+from viennatalksbout.datasource import Post
+from viennatalksbout.extractor import ExtractedTopic, TopicExtractor
+from viennatalksbout.health import HealthMonitor
+from viennatalksbout.ingest import (
     DEFAULT_BUFFER_MAX_BATCH_SIZE,
     DEFAULT_BUFFER_WINDOW_SECONDS,
     DEFAULT_HEALTH_LOG_INTERVAL,
@@ -38,8 +38,8 @@ from talkbout.ingest import (
     load_pipeline_config,
     setup_logging,
 )
-from talkbout.mastodon.stream import MastodonDatasource
-from talkbout.store import TopicStore
+from viennatalksbout.mastodon.stream import MastodonDatasource
+from viennatalksbout.store import TopicStore
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ class TestSetupLogging:
     """Tests for structured logging setup."""
 
     def test_default_log_level_is_info(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.delenv("TALKBOUT_LOG_LEVEL", raising=False)
+        monkeypatch.delenv("VIENNATALKSBOUT_LOG_LEVEL", raising=False)
         root = logging.getLogger()
         old_level = root.level
         try:
@@ -97,7 +97,7 @@ class TestSetupLogging:
             root.setLevel(old_level)
 
     def test_custom_log_level(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setenv("TALKBOUT_LOG_LEVEL", "DEBUG")
+        monkeypatch.setenv("VIENNATALKSBOUT_LOG_LEVEL", "DEBUG")
         root = logging.getLogger()
         old_level = root.level
         try:
@@ -109,7 +109,7 @@ class TestSetupLogging:
     def test_invalid_log_level_falls_back_to_info(
         self, monkeypatch: pytest.MonkeyPatch
     ):
-        monkeypatch.setenv("TALKBOUT_LOG_LEVEL", "INVALID")
+        monkeypatch.setenv("VIENNATALKSBOUT_LOG_LEVEL", "INVALID")
         root = logging.getLogger()
         old_level = root.level
         try:
@@ -129,12 +129,12 @@ class TestLoadPipelineConfig:
 
     def test_defaults(self, monkeypatch: pytest.MonkeyPatch):
         for key in [
-            "TALKBOUT_BUFFER_WINDOW_SECONDS",
-            "TALKBOUT_BUFFER_MAX_BATCH_SIZE",
-            "TALKBOUT_SNAPSHOT_DIR",
-            "TALKBOUT_RETENTION_HOURS",
-            "TALKBOUT_STALE_STREAM_SECONDS",
-            "TALKBOUT_HEALTH_LOG_INTERVAL",
+            "VIENNATALKSBOUT_BUFFER_WINDOW_SECONDS",
+            "VIENNATALKSBOUT_BUFFER_MAX_BATCH_SIZE",
+            "VIENNATALKSBOUT_SNAPSHOT_DIR",
+            "VIENNATALKSBOUT_RETENTION_HOURS",
+            "VIENNATALKSBOUT_STALE_STREAM_SECONDS",
+            "VIENNATALKSBOUT_HEALTH_LOG_INTERVAL",
         ]:
             monkeypatch.delenv(key, raising=False)
 
@@ -147,12 +147,12 @@ class TestLoadPipelineConfig:
         assert config["health_log_interval"] == DEFAULT_HEALTH_LOG_INTERVAL
 
     def test_custom_values(self, monkeypatch: pytest.MonkeyPatch):
-        monkeypatch.setenv("TALKBOUT_BUFFER_WINDOW_SECONDS", "300")
-        monkeypatch.setenv("TALKBOUT_BUFFER_MAX_BATCH_SIZE", "50")
-        monkeypatch.setenv("TALKBOUT_SNAPSHOT_DIR", "/tmp/snapshots")
-        monkeypatch.setenv("TALKBOUT_RETENTION_HOURS", "48")
-        monkeypatch.setenv("TALKBOUT_STALE_STREAM_SECONDS", "900")
-        monkeypatch.setenv("TALKBOUT_HEALTH_LOG_INTERVAL", "120")
+        monkeypatch.setenv("VIENNATALKSBOUT_BUFFER_WINDOW_SECONDS", "300")
+        monkeypatch.setenv("VIENNATALKSBOUT_BUFFER_MAX_BATCH_SIZE", "50")
+        monkeypatch.setenv("VIENNATALKSBOUT_SNAPSHOT_DIR", "/tmp/snapshots")
+        monkeypatch.setenv("VIENNATALKSBOUT_RETENTION_HOURS", "48")
+        monkeypatch.setenv("VIENNATALKSBOUT_STALE_STREAM_SECONDS", "900")
+        monkeypatch.setenv("VIENNATALKSBOUT_HEALTH_LOG_INTERVAL", "120")
 
         config = load_pipeline_config()
         assert config["buffer_window_seconds"] == 300
@@ -614,9 +614,9 @@ class TestBuildPipeline:
         monkeypatch.setenv("MASTODON_CLIENT_SECRET", "test_client_secret")
         monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "test_access_token")
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
-        monkeypatch.setenv("TALKBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots"))
+        monkeypatch.setenv("VIENNATALKSBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots"))
 
-        with patch("talkbout.extractor.anthropic.Anthropic"):
+        with patch("viennatalksbout.extractor.anthropic.Anthropic"):
             pipeline = build_pipeline()
 
         assert pipeline is not None

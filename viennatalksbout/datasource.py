@@ -1,4 +1,4 @@
-"""Abstract base interface for TalkBout datasources.
+"""Abstract base interface for ViennaTalksBout datasources.
 
 Defines the common contract that all datasources (Mastodon, Reddit, etc.)
 must implement, plus the normalized Post model that flows through the pipeline.
@@ -32,7 +32,7 @@ class Post:
 
 
 class BaseDatasource(ABC):
-    """Abstract interface for TalkBout datasources.
+    """Abstract interface for ViennaTalksBout datasources.
 
     Each datasource connects to an external platform, receives posts in
     real time, normalizes them into Post objects, and delivers them via

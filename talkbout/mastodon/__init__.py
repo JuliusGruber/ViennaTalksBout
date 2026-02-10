@@ -1,1 +1,0 @@
-"""Mastodon datasource for TalkBout."""

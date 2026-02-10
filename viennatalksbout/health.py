@@ -1,4 +1,4 @@
-"""Health monitoring for the TalkBout ingestion pipeline.
+"""Health monitoring for the ViennaTalksBout ingestion pipeline.
 
 Tracks pipeline health metrics including:
 - Time since last received post (stale connection detection)

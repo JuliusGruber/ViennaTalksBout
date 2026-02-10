@@ -1,4 +1,4 @@
-"""Tests for talkbout.config — configuration loading and validation."""
+"""Tests for viennatalksbout.config — configuration loading and validation."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from talkbout.config import (
+from viennatalksbout.config import (
     DEFAULT_EXTRACTOR_MODEL,
     ExtractorConfig,
     MastodonConfig,

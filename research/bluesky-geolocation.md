@@ -84,9 +84,9 @@ All schemas use the `community.lexicon.location.*` namespace:
 - No mainstream Bluesky client has adopted these schemas yet
 - The schemas enable interoperability: any app using `community.lexicon.location.*` records would have posts visible across shared infrastructure
 
-### Implications for TalkBout
+### Implications for ViennaTalksBout
 
-These community schemas are **not yet usable** for TalkBout's purposes:
+These community schemas are **not yet usable** for ViennaTalksBout's purposes:
 - They are still in development / early adoption
 - Mainstream Bluesky users do not attach location data to posts
 - Even once available, adoption would be opt-in — most posts would still lack location data
@@ -105,7 +105,7 @@ These community schemas are **not yet usable** for TalkBout's purposes:
 
 - Bluesky's architecture allows anyone to build custom feed algorithms
 - A feed generator could in theory implement keyword/NLP-based location filtering
-- However, content-based location inference is unreliable and does not meet TalkBout's requirement for geolocation filtering as a must-have
+- However, content-based location inference is unreliable and does not meet ViennaTalksBout's requirement for geolocation filtering as a must-have
 
 ## Comparison With Other Platforms
 
@@ -116,9 +116,9 @@ These community schemas are **not yet usable** for TalkBout's purposes:
 | Reddit | No | Subreddit-based locality (r/vienna); no geo coordinates |
 | **Bluesky** | **No** | No location data at any level; no structural locality mechanism |
 
-## Conclusion for TalkBout
+## Conclusion for ViennaTalksBout
 
-**The absence of native geolocation filtering is a significant limitation for Bluesky as a TalkBout data source.** Geolocation filtering — whether native (API-level geo parameters) or structural (instance-based locality, topic-specific communities) — is a must-have requirement for TalkBout data sources. Bluesky offers neither.
+**The absence of native geolocation filtering is a significant limitation for Bluesky as a ViennaTalksBout data source.** Geolocation filtering — whether native (API-level geo parameters) or structural (instance-based locality, topic-specific communities) — is a must-have requirement for ViennaTalksBout data sources. Bluesky offers neither.
 
 The community location schemas are worth monitoring, but they will not provide meaningful coverage anytime soon. Even once available, adoption would be opt-in and limited to specific apps — most posts would still lack location data.
 

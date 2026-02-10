@@ -1,4 +1,4 @@
-# Reddit as a Data Source for TalkBout — In-Depth Research
+# Reddit as a Data Source for ViennaTalksBout — In-Depth Research
 
 Research date: 2026-02-07
 
@@ -27,7 +27,7 @@ The **$0.24 per 1,000 API calls** rate remains unchanged through 2026.
 - High-volume usage requires individual enterprise negotiations
 - Volume discounts start at millions of requests monthly
 
-**TalkBout classification question:** Reddit's terms define commercial as "mobile apps with ads, services with paywalls, or any monetized products." A free, open, non-monetized website likely qualifies for the free tier. However, Reddit's May 2024 Public Content Policy states that any company wanting to use data to "power, augment or enhance products for commercial purposes" needs a contract.
+**ViennaTalksBout classification question:** Reddit's terms define commercial as "mobile apps with ads, services with paywalls, or any monetized products." A free, open, non-monetized website likely qualifies for the free tier. However, Reddit's May 2024 Public Content Policy states that any company wanting to use data to "power, augment or enhance products for commercial purposes" needs a contract.
 
 ### Key Policy Documents
 
@@ -56,9 +56,9 @@ Reddit's API does not provide geographic filtering for posts. There are no geo-t
 
 ### Reliability of Subreddit-Based Locality
 
-For TalkBout's use case (extracting trending topics), subreddit-based locality is sufficient. The topics discussed in r/wien are inherently Vienna-focused by community norms and moderation. If someone posts about "U2 Störung" in r/wien, the topic is Vienna-relevant regardless of the poster's physical location.
+For ViennaTalksBout's use case (extracting trending topics), subreddit-based locality is sufficient. The topics discussed in r/wien are inherently Vienna-focused by community norms and moderation. If someone posts about "U2 Störung" in r/wien, the topic is Vienna-relevant regardless of the poster's physical location.
 
-This meets TalkBout's must-have requirement for geolocation filtering through **structural locality**.
+This meets ViennaTalksBout's must-have requirement for geolocation filtering through **structural locality**.
 
 ---
 
@@ -85,7 +85,7 @@ PRAW's `SubredditStream` provides a streaming-like interface, but it is implemen
 | Low-activity subreddit | Up to ~16 seconds (max backoff) |
 | Very high volume (r/all) | May **drop items** |
 
-**Bottom line:** PRAW streaming is adequate for TalkBout. Expect 2-16 second latency, which is acceptable for a tag cloud that updates live but doesn't need sub-second freshness. However, this is less real-time than Mastodon's SSE streaming.
+**Bottom line:** PRAW streaming is adequate for ViennaTalksBout. Expect 2-16 second latency, which is acceptable for a tag cloud that updates live but doesn't need sub-second freshness. However, this is less real-time than Mastodon's SSE streaming.
 
 ---
 
@@ -97,7 +97,7 @@ PRAW's `SubredditStream` provides a streaming-like interface, but it is implemen
 | **r/wien** | ~130,000-204,000 | ~3-15 | ~20-100 | High |
 | **r/vienna** | ~3,900 | <1 | <1 | Nearly dead |
 
-**Estimated combined daily volume for TalkBout:**
+**Estimated combined daily volume for ViennaTalksBout:**
 
 | Metric | Conservative | Moderate | Optimistic |
 |--------|-------------|----------|-----------|
@@ -119,7 +119,7 @@ Reddit's value is in the quality and depth of discussion (longer comments, more 
 
 **Rate limit response headers:** `X-Ratelimit-Used`, `X-Ratelimit-Remaining`, `X-Ratelimit-Reset`
 
-**Practical budget for TalkBout (at 60 QPM conservative):**
+**Practical budget for ViennaTalksBout (at 60 QPM conservative):**
 - 4 streams (r/wien posts + comments, r/austria posts + comments): ~16 req/min
 - Remaining budget: ~44 req/min for other operations
 
@@ -140,7 +140,7 @@ Reddit's value is in the quality and depth of discussion (longer comments, more 
 - Commercial use without a contract
 - Circumventing rate limits
 
-### TalkBout Risk Assessment
+### ViennaTalksBout Risk Assessment
 
 | Factor | Risk Level | Notes |
 |--------|-----------|-------|

@@ -1,6 +1,6 @@
 # Bluesky Data Delivery & Expected Volumes
 
-Research into how Bluesky delivers data via Jetstream and what data volumes TalkBout should expect to handle.
+Research into how Bluesky delivers data via Jetstream and what data volumes ViennaTalksBout should expect to handle.
 
 ## Two Delivery Mechanisms
 
@@ -16,7 +16,7 @@ Bluesky offers two real-time data streams. Both are WebSocket-based.
 | **Authentication to consume** | None | None |
 | **Self-authenticating data** | Yes | No — acceptable for read-only ingestion |
 
-**TalkBout should use Jetstream.** It's simpler, dramatically smaller, filterable, and the lack of cryptographic verification is irrelevant for our read-only trend extraction use case.
+**ViennaTalksBout should use Jetstream.** It's simpler, dramatically smaller, filterable, and the lack of cryptographic verification is irrelevant for our read-only trend extraction use case.
 
 ## Jetstream Connection
 
@@ -66,7 +66,7 @@ Jetstream delivers three event types. All subscribers receive Identity and Accou
 
 ### 1. Commit Event (posts, likes, follows, etc.)
 
-This is the primary event type. For TalkBout, we filter to `app.bsky.feed.post` commits.
+This is the primary event type. For ViennaTalksBout, we filter to `app.bsky.feed.post` commits.
 
 ```json
 {
@@ -105,7 +105,7 @@ This is the primary event type. For TalkBout, we filter to `app.bsky.feed.post` 
 }
 ```
 
-**Key fields for TalkBout:**
+**Key fields for ViennaTalksBout:**
 
 | Field | Use |
 |---|---|
@@ -151,7 +151,7 @@ Useful for maintaining a DID→handle cache. Low volume — can be safely ignore
 }
 ```
 
-Indicates account status changes (active, deactivated, taken down). Low volume — TalkBout can ignore these.
+Indicates account status changes (active, deactivated, taken down). Low volume — ViennaTalksBout can ignore these.
 
 ## Expected Data Volumes
 
@@ -176,9 +176,9 @@ Indicates account status changes (active, deactivated, taken down). Low volume �
 
 > **Note:** The ~850 MB/day figure is from September 2024. Bluesky has grown since then, so actual volumes may be 1.5–2x higher today. Plan for **~1–2 GB/day** for posts-only uncompressed.
 
-### What TalkBout Will Actually Process
+### What ViennaTalksBout Will Actually Process
 
-TalkBout does not need the full global post stream. After connecting with `wantedCollections=app.bsky.feed.post`, posts can be filtered by language. However, **Bluesky has no native geolocation filtering** — there is no way to isolate Vienna-relevant posts at the API level, and no structural locality mechanism (unlike subreddit- or instance-based filtering on other platforms). Estimated funnel:
+ViennaTalksBout does not need the full global post stream. After connecting with `wantedCollections=app.bsky.feed.post`, posts can be filtered by language. However, **Bluesky has no native geolocation filtering** — there is no way to isolate Vienna-relevant posts at the API level, and no structural locality mechanism (unlike subreddit- or instance-based filtering on other platforms). Estimated funnel:
 
 | Stage | Events/Day (estimate) | Volume |
 |---|---|---|
@@ -199,7 +199,7 @@ Individual Jetstream messages are small:
 | Like | ~350 bytes | ~150 bytes |
 | Identity/Account | ~200 bytes | ~100 bytes |
 
-## Implications for TalkBout Architecture
+## Implications for ViennaTalksBout Architecture
 
 ### Ingestion is Lightweight
 
@@ -225,8 +225,8 @@ Individual Jetstream messages are small:
 
 ### Limitations to Plan For
 
-- **No geo-filtering:** Bluesky has no native location data and no structural locality mechanism (unlike subreddit- or instance-based approaches on other platforms). Community-driven `community.lexicon.location.*` schemas are in development but not yet in production or widely adopted. This is a fundamental limitation for TalkBout, which requires geolocation filtering as a must-have for any data source. See `research/bluesky-geolocation.md` for details.
-- **Not self-authenticating:** Jetstream strips cryptographic proofs. Data could theoretically be tampered with by the Jetstream instance. Acceptable for TalkBout's use case.
+- **No geo-filtering:** Bluesky has no native location data and no structural locality mechanism (unlike subreddit- or instance-based approaches on other platforms). Community-driven `community.lexicon.location.*` schemas are in development but not yet in production or widely adopted. This is a fundamental limitation for ViennaTalksBout, which requires geolocation filtering as a must-have for any data source. See `research/bluesky-geolocation.md` for details.
+- **Not self-authenticating:** Jetstream strips cryptographic proofs. Data could theoretically be tampered with by the Jetstream instance. Acceptable for ViennaTalksBout's use case.
 - **Not formally part of AT Protocol:** Bluesky operates Jetstream as a convenience service. They plan to eventually fold its advantages into the core protocol firehose, which could mean API changes.
 - **No SLA on public instances:** The 4 public instances are best-effort. For production reliability, consider running a private Jetstream instance (it's open source).
 

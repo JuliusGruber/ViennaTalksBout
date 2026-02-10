@@ -1,8 +1,8 @@
-# TalkBout - Product Idea
+# ViennaTalksBout - Product Idea
 
 ## Vision
 
-TalkBout is a real-time tag cloud that shows what topics people are posting, writing, and commenting about online — starting with Vienna. Anyone can open the web app and instantly see what the city is talking about right now.
+ViennaTalksBout is a real-time tag cloud that shows what topics people are posting, writing, and commenting about online — starting with Vienna. Anyone can open the web app and instantly see what the city is talking about right now.
 
 ## MVP Scope
 

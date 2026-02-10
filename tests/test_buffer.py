@@ -1,4 +1,4 @@
-"""Tests for talkbout.buffer — PostBatch, PostBuffer, thread safety, and edge cases."""
+"""Tests for viennatalksbout.buffer — PostBatch, PostBuffer, thread safety, and edge cases."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from talkbout.buffer import (
+from viennatalksbout.buffer import (
     DEFAULT_MAX_BATCH_SIZE,
     DEFAULT_WINDOW_SECONDS,
     PostBatch,
     PostBuffer,
 )
-from talkbout.datasource import Post
+from viennatalksbout.datasource import Post
 
 
 # ---------------------------------------------------------------------------
