@@ -1,0 +1,369 @@
+"""Ingestion pipeline orchestrator for TalkBout.
+
+Wires all components into a running pipeline:
+
+    Mastodon SSE stream → PostBuffer → TopicExtractor → TopicStore
+
+Run with ``python -m talkbout.ingest``.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import signal
+import threading
+from pathlib import Path
+from types import FrameType
+
+from talkbout.buffer import PostBatch, PostBuffer
+from talkbout.config import load_config, load_extractor_config
+from talkbout.datasource import Post
+from talkbout.extractor import TopicExtractor
+from talkbout.health import HealthMonitor
+from talkbout.mastodon.stream import MastodonDatasource
+from talkbout.store import TopicStore
+
+logger = logging.getLogger(__name__)
+
+# Defaults for pipeline-level settings (read from environment)
+DEFAULT_BUFFER_WINDOW_SECONDS = 600  # 10 minutes
+DEFAULT_BUFFER_MAX_BATCH_SIZE = 100
+DEFAULT_SNAPSHOT_DIR = "data/snapshots"
+DEFAULT_RETENTION_HOURS = 24
+DEFAULT_STALE_STREAM_SECONDS = 1800  # 30 minutes
+DEFAULT_HEALTH_LOG_INTERVAL = 300  # 5 minutes
+
+
+def setup_logging() -> None:
+    """Configure structured logging for the pipeline."""
+    log_level = os.environ.get("TALKBOUT_LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, log_level, logging.INFO)
+    root = logging.getLogger()
+    root.setLevel(level)
+    if not root.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(
+            logging.Formatter(
+                fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+        )
+        root.addHandler(handler)
+
+
+def load_pipeline_config() -> dict:
+    """Load pipeline-level configuration from environment variables.
+
+    Returns a dict with pipeline settings (buffer window, snapshot dir, etc.).
+    Mastodon and extractor configs are loaded separately.
+    """
+    return {
+        "buffer_window_seconds": int(
+            os.environ.get(
+                "TALKBOUT_BUFFER_WINDOW_SECONDS",
+                str(DEFAULT_BUFFER_WINDOW_SECONDS),
+            )
+        ),
+        "buffer_max_batch_size": int(
+            os.environ.get(
+                "TALKBOUT_BUFFER_MAX_BATCH_SIZE",
+                str(DEFAULT_BUFFER_MAX_BATCH_SIZE),
+            )
+        ),
+        "snapshot_dir": os.environ.get(
+            "TALKBOUT_SNAPSHOT_DIR", DEFAULT_SNAPSHOT_DIR
+        ),
+        "retention_hours": int(
+            os.environ.get(
+                "TALKBOUT_RETENTION_HOURS",
+                str(DEFAULT_RETENTION_HOURS),
+            )
+        ),
+        "stale_stream_seconds": float(
+            os.environ.get(
+                "TALKBOUT_STALE_STREAM_SECONDS",
+                str(DEFAULT_STALE_STREAM_SECONDS),
+            )
+        ),
+        "health_log_interval": float(
+            os.environ.get(
+                "TALKBOUT_HEALTH_LOG_INTERVAL",
+                str(DEFAULT_HEALTH_LOG_INTERVAL),
+            )
+        ),
+    }
+
+
+class IngestionPipeline:
+    """Orchestrates the full ingestion pipeline.
+
+    Wires: MastodonDatasource → PostBuffer → TopicExtractor → TopicStore
+
+    Handles signal-based graceful shutdown, periodic health logging,
+    and periodic snapshot saving.
+
+    Args:
+        datasource: The streaming datasource (Mastodon).
+        buffer: The post buffer for batching.
+        extractor: The Claude-powered topic extractor.
+        store: The topic store with lifecycle management.
+        health: The health monitor.
+        health_log_interval: Seconds between health log entries.
+    """
+
+    def __init__(
+        self,
+        datasource: MastodonDatasource,
+        buffer: PostBuffer,
+        extractor: TopicExtractor,
+        store: TopicStore,
+        health: HealthMonitor,
+        health_log_interval: float = DEFAULT_HEALTH_LOG_INTERVAL,
+    ) -> None:
+        self._datasource = datasource
+        self._buffer = buffer
+        self._extractor = extractor
+        self._store = store
+        self._health = health
+        self._health_log_interval = health_log_interval
+
+        self._stop_event = threading.Event()
+        self._health_timer: threading.Timer | None = None
+        self._original_sigint: signal.Handlers | None = None
+        self._original_sigterm: signal.Handlers | None = None
+
+    @property
+    def health(self) -> HealthMonitor:
+        """The health monitor instance."""
+        return self._health
+
+    @property
+    def store(self) -> TopicStore:
+        """The topic store instance."""
+        return self._store
+
+    def _on_post(self, post: Post) -> None:
+        """Callback: datasource received a post → add to buffer."""
+        self._health.record_post()
+        self._buffer.add_post(post)
+        logger.debug("Post received: %s (source=%s)", post.id, post.source)
+
+    def _on_batch(self, batch: PostBatch) -> None:
+        """Callback: buffer flushed a batch → extract topics → merge into store."""
+        logger.info(
+            "Processing batch: %d posts (window %s → %s)",
+            batch.post_count,
+            batch.window_start.strftime("%H:%M:%S"),
+            batch.window_end.strftime("%H:%M:%S"),
+        )
+
+        topics = self._extractor.extract(batch)
+
+        if topics:
+            self._health.record_batch_success(len(topics))
+            self._store.merge(topics, batch.source)
+            logger.info(
+                "Merged %d topics into store (active: %d)",
+                len(topics),
+                self._store.get_topic_count(),
+            )
+        else:
+            if batch.post_count > 0:
+                self._health.record_batch_failure()
+                logger.warning(
+                    "No topics extracted from batch of %d posts",
+                    batch.post_count,
+                )
+            else:
+                self._health.record_batch_success(0)
+
+        # Save snapshot and clean up old ones
+        self._store.save_snapshot()
+        self._store.cleanup_snapshots()
+
+    def _on_stream_error(self, err: Exception) -> None:
+        """Callback: stream encountered an error."""
+        logger.error("Stream error: %s", err)
+
+    def _on_signal(self, signum: int, frame: FrameType | None) -> None:
+        """Signal handler for graceful shutdown."""
+        sig_name = signal.Signals(signum).name
+        logger.info("Received %s — initiating graceful shutdown", sig_name)
+        self._stop_event.set()
+
+    def _schedule_health_log(self) -> None:
+        """Schedule the next periodic health log."""
+        if self._stop_event.is_set():
+            return
+        self._health_timer = threading.Timer(
+            self._health_log_interval, self._health_log_tick
+        )
+        self._health_timer.daemon = True
+        self._health_timer.start()
+
+    def _health_log_tick(self) -> None:
+        """Periodic health log callback."""
+        self._health.check_and_log()
+        self._schedule_health_log()
+
+    def start(self) -> None:
+        """Start the pipeline and block until shutdown is requested.
+
+        Installs signal handlers for SIGINT and SIGTERM, starts the
+        datasource, buffer, and health logging, then waits for the
+        stop event.
+        """
+        logger.info("Starting TalkBout ingestion pipeline")
+
+        # Install signal handlers
+        self._original_sigint = signal.getsignal(signal.SIGINT)
+        self._original_sigterm = signal.getsignal(signal.SIGTERM)
+        signal.signal(signal.SIGINT, self._on_signal)
+        signal.signal(signal.SIGTERM, self._on_signal)
+
+        # Start components
+        self._buffer.start()
+        logger.info("Post buffer started")
+
+        self._datasource.start(self._on_post, on_error=self._on_stream_error)
+        logger.info(
+            "Streaming from %s", self._datasource.source_id
+        )
+
+        # Start periodic health logging
+        self._schedule_health_log()
+
+        logger.info("Pipeline running — press Ctrl+C to stop")
+
+        # Block until shutdown
+        self._stop_event.wait()
+
+        # Graceful shutdown
+        self.stop()
+
+    def stop(self) -> None:
+        """Stop all pipeline components gracefully.
+
+        1. Stop the datasource (close SSE connection)
+        2. Stop the buffer (flushes pending posts)
+        3. Cancel health timer
+        4. Save a final snapshot
+        5. Restore original signal handlers
+        """
+        logger.info("Shutting down pipeline...")
+
+        # Stop the datasource first (no more incoming posts)
+        try:
+            self._datasource.stop()
+            logger.info("Datasource stopped")
+        except Exception:
+            logger.exception("Error stopping datasource")
+
+        # Stop buffer (triggers final flush → extractor → store)
+        try:
+            self._buffer.stop()
+            logger.info("Buffer stopped (final flush complete)")
+        except Exception:
+            logger.exception("Error stopping buffer")
+
+        # Cancel health timer
+        if self._health_timer is not None:
+            self._health_timer.cancel()
+            self._health_timer = None
+
+        # Final snapshot
+        try:
+            self._store.save_snapshot()
+            logger.info("Final snapshot saved")
+        except Exception:
+            logger.exception("Error saving final snapshot")
+
+        # Final health report
+        self._health.check_and_log()
+
+        # Restore original signal handlers
+        if self._original_sigint is not None:
+            signal.signal(signal.SIGINT, self._original_sigint)
+        if self._original_sigterm is not None:
+            signal.signal(signal.SIGTERM, self._original_sigterm)
+
+        logger.info("Pipeline shutdown complete")
+
+
+def build_pipeline() -> IngestionPipeline:
+    """Build the ingestion pipeline from environment configuration.
+
+    Loads all configuration, creates components, and wires them together.
+
+    Returns:
+        A configured IngestionPipeline ready to start.
+
+    Raises:
+        ValueError: If required configuration is missing or invalid.
+    """
+    mastodon_config = load_config()
+    extractor_config = load_extractor_config()
+    pipeline_config = load_pipeline_config()
+
+    logger.info(
+        "Configuration loaded: instance=%s, model=%s, "
+        "buffer_window=%ds, snapshot_dir=%s",
+        mastodon_config.instance_url,
+        extractor_config.model,
+        pipeline_config["buffer_window_seconds"],
+        pipeline_config["snapshot_dir"],
+    )
+
+    datasource = MastodonDatasource(
+        instance_url=mastodon_config.instance_url,
+        access_token=mastodon_config.access_token,
+    )
+
+    extractor = TopicExtractor(
+        api_key=extractor_config.api_key,
+        model=extractor_config.model,
+    )
+
+    store = TopicStore(
+        snapshot_dir=pipeline_config["snapshot_dir"],
+        retention_hours=pipeline_config["retention_hours"],
+    )
+
+    health = HealthMonitor(
+        stale_stream_seconds=pipeline_config["stale_stream_seconds"],
+    )
+
+    buffer = PostBuffer(
+        window_seconds=pipeline_config["buffer_window_seconds"],
+        source=datasource.source_id,
+        on_batch=None,  # Will be set after pipeline creation
+        max_batch_size=pipeline_config["buffer_max_batch_size"],
+    )
+
+    pipeline = IngestionPipeline(
+        datasource=datasource,
+        buffer=buffer,
+        extractor=extractor,
+        store=store,
+        health=health,
+        health_log_interval=pipeline_config["health_log_interval"],
+    )
+
+    # Wire the buffer's on_batch callback to the pipeline
+    buffer._on_batch = pipeline._on_batch
+
+    return pipeline
+
+
+def main() -> None:
+    """Entry point for ``python -m talkbout.ingest``."""
+    setup_logging()
+
+    try:
+        pipeline = build_pipeline()
+    except ValueError as exc:
+        logger.error("Configuration error: %s", exc)
+        raise SystemExit(1) from exc
+
+    pipeline.start()

@@ -35,8 +35,6 @@ markers = [
 
 [tool.coverage.run]
 source = ["talkbout"]
-# Exclude CLI entry point — glue code reworked in Phase 6 (Integration)
-omit = ["talkbout/__main__.py"]
 
 [tool.coverage.report]
 fail_under = 90

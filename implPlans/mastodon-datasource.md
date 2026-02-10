@@ -402,16 +402,16 @@ Check off each item as it is completed. A phase is only done when all its items 
 - [x] Write tests: snapshot persistence and loading
 - [x] Write tests: snapshot cleanup policy
 
-### Phase 6: Integration & End-to-End Pipeline
+### Phase 6: Integration & End-to-End Pipeline ✓
 
-- [ ] Create main entry point (`python -m talkbout.ingest`)
-- [ ] Wire all components: stream → buffer → extractor → store
-- [ ] Implement configuration management (instance URL, credentials, buffer window, model, retention)
-- [ ] Implement structured logging (use Python `logging` module, define log format)
-- [ ] Implement health monitoring (last post timestamp, LLM success/failure rate)
-- [ ] Implement graceful shutdown (signal handling, buffer flush, SSE disconnect)
-- [ ] Write integration tests: full pipeline with mocked Mastodon stream and mocked Claude API
-- [ ] Write tests: configuration loading and validation
-- [ ] Write tests: health monitoring thresholds and alerts
-- [ ] Write tests: graceful shutdown flushes buffer and closes connections
-- [ ] Verify ≥90% test coverage across all modules (`pytest --cov`)
+- [x] Create main entry point (`python -m talkbout.ingest`)
+- [x] Wire all components: stream → buffer → extractor → store
+- [x] Implement configuration management (instance URL, credentials, buffer window, model, retention)
+- [x] Implement structured logging (use Python `logging` module, define log format)
+- [x] Implement health monitoring (last post timestamp, LLM success/failure rate)
+- [x] Implement graceful shutdown (signal handling, buffer flush, SSE disconnect)
+- [x] Write integration tests: full pipeline with mocked Mastodon stream and mocked Claude API
+- [x] Write tests: configuration loading and validation
+- [x] Write tests: health monitoring thresholds and alerts
+- [x] Write tests: graceful shutdown flushes buffer and closes connections
+- [x] Verify ≥90% test coverage across all modules (`pytest --cov`)
