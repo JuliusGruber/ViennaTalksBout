@@ -29,7 +29,9 @@ from viennatalksbout.health import HealthMonitor
 from viennatalksbout.ingest import (
     DEFAULT_BUFFER_MAX_BATCH_SIZE,
     DEFAULT_BUFFER_WINDOW_SECONDS,
+    DEFAULT_DATASOURCE_MODE,
     DEFAULT_HEALTH_LOG_INTERVAL,
+    DEFAULT_POLL_INTERVAL_SECONDS,
     DEFAULT_RETENTION_HOURS,
     DEFAULT_SNAPSHOT_DIR,
     DEFAULT_STALE_STREAM_SECONDS,
@@ -38,6 +40,7 @@ from viennatalksbout.ingest import (
     load_pipeline_config,
     setup_logging,
 )
+from viennatalksbout.mastodon.polling import MastodonPollingDatasource
 from viennatalksbout.mastodon.stream import MastodonDatasource
 from viennatalksbout.store import TopicStore
 
@@ -135,6 +138,8 @@ class TestLoadPipelineConfig:
             "VIENNATALKSBOUT_RETENTION_HOURS",
             "VIENNATALKSBOUT_STALE_STREAM_SECONDS",
             "VIENNATALKSBOUT_HEALTH_LOG_INTERVAL",
+            "MASTODON_DATASOURCE_MODE",
+            "MASTODON_POLL_INTERVAL_SECONDS",
         ]:
             monkeypatch.delenv(key, raising=False)
 
@@ -145,6 +150,8 @@ class TestLoadPipelineConfig:
         assert config["retention_hours"] == DEFAULT_RETENTION_HOURS
         assert config["stale_stream_seconds"] == DEFAULT_STALE_STREAM_SECONDS
         assert config["health_log_interval"] == DEFAULT_HEALTH_LOG_INTERVAL
+        assert config["datasource_mode"] == DEFAULT_DATASOURCE_MODE
+        assert config["poll_interval_seconds"] == DEFAULT_POLL_INTERVAL_SECONDS
 
     def test_custom_values(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("VIENNATALKSBOUT_BUFFER_WINDOW_SECONDS", "300")
@@ -153,6 +160,8 @@ class TestLoadPipelineConfig:
         monkeypatch.setenv("VIENNATALKSBOUT_RETENTION_HOURS", "48")
         monkeypatch.setenv("VIENNATALKSBOUT_STALE_STREAM_SECONDS", "900")
         monkeypatch.setenv("VIENNATALKSBOUT_HEALTH_LOG_INTERVAL", "120")
+        monkeypatch.setenv("MASTODON_DATASOURCE_MODE", "polling")
+        monkeypatch.setenv("MASTODON_POLL_INTERVAL_SECONDS", "15")
 
         config = load_pipeline_config()
         assert config["buffer_window_seconds"] == 300
@@ -161,6 +170,8 @@ class TestLoadPipelineConfig:
         assert config["retention_hours"] == 48
         assert config["stale_stream_seconds"] == 900.0
         assert config["health_log_interval"] == 120.0
+        assert config["datasource_mode"] == "polling"
+        assert config["poll_interval_seconds"] == 15
 
 
 # ===========================================================================
@@ -648,3 +659,39 @@ class TestBuildPipeline:
 
         with pytest.raises(ValueError, match="Invalid extractor configuration"):
             build_pipeline()
+
+    def test_build_pipeline_default_mode_creates_streaming_datasource(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Default mode (stream) should create MastodonDatasource."""
+        monkeypatch.setenv("MASTODON_INSTANCE_URL", "https://wien.rocks")
+        monkeypatch.setenv("MASTODON_CLIENT_ID", "test_client_id")
+        monkeypatch.setenv("MASTODON_CLIENT_SECRET", "test_client_secret")
+        monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "test_access_token")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+        monkeypatch.setenv("VIENNATALKSBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots"))
+        monkeypatch.delenv("MASTODON_DATASOURCE_MODE", raising=False)
+
+        with patch("viennatalksbout.extractor.anthropic.Anthropic"):
+            pipeline = build_pipeline()
+
+        assert isinstance(pipeline._datasource, MastodonDatasource)
+
+    def test_build_pipeline_polling_mode_creates_polling_datasource(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """MASTODON_DATASOURCE_MODE=polling should create MastodonPollingDatasource."""
+        monkeypatch.setenv("MASTODON_INSTANCE_URL", "https://wien.rocks")
+        monkeypatch.setenv("MASTODON_CLIENT_ID", "test_client_id")
+        monkeypatch.setenv("MASTODON_CLIENT_SECRET", "test_client_secret")
+        monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "test_access_token")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+        monkeypatch.setenv("VIENNATALKSBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots"))
+        monkeypatch.setenv("MASTODON_DATASOURCE_MODE", "polling")
+        monkeypatch.setenv("MASTODON_POLL_INTERVAL_SECONDS", "15")
+
+        with patch("viennatalksbout.extractor.anthropic.Anthropic"):
+            pipeline = build_pipeline()
+
+        assert isinstance(pipeline._datasource, MastodonPollingDatasource)
+        assert pipeline._datasource._poll_interval == 15

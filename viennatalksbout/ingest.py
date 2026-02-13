@@ -18,9 +18,10 @@ from types import FrameType
 
 from viennatalksbout.buffer import PostBatch, PostBuffer
 from viennatalksbout.config import load_config, load_extractor_config
-from viennatalksbout.datasource import Post
+from viennatalksbout.datasource import BaseDatasource, Post
 from viennatalksbout.extractor import TopicExtractor
 from viennatalksbout.health import HealthMonitor
+from viennatalksbout.mastodon.polling import MastodonPollingDatasource
 from viennatalksbout.mastodon.stream import MastodonDatasource
 from viennatalksbout.store import TopicStore
 
@@ -33,6 +34,8 @@ DEFAULT_SNAPSHOT_DIR = "data/snapshots"
 DEFAULT_RETENTION_HOURS = 24
 DEFAULT_STALE_STREAM_SECONDS = 1800  # 30 minutes
 DEFAULT_HEALTH_LOG_INTERVAL = 300  # 5 minutes
+DEFAULT_DATASOURCE_MODE = "stream"
+DEFAULT_POLL_INTERVAL_SECONDS = 30
 
 
 def setup_logging() -> None:
@@ -92,6 +95,15 @@ def load_pipeline_config() -> dict:
                 str(DEFAULT_HEALTH_LOG_INTERVAL),
             )
         ),
+        "datasource_mode": os.environ.get(
+            "MASTODON_DATASOURCE_MODE", DEFAULT_DATASOURCE_MODE
+        ),
+        "poll_interval_seconds": int(
+            os.environ.get(
+                "MASTODON_POLL_INTERVAL_SECONDS",
+                str(DEFAULT_POLL_INTERVAL_SECONDS),
+            )
+        ),
     }
 
 
@@ -114,7 +126,7 @@ class IngestionPipeline:
 
     def __init__(
         self,
-        datasource: MastodonDatasource,
+        datasource: BaseDatasource,
         buffer: PostBuffer,
         extractor: TopicExtractor,
         store: TopicStore,
@@ -315,10 +327,18 @@ def build_pipeline() -> IngestionPipeline:
         pipeline_config["snapshot_dir"],
     )
 
-    datasource = MastodonDatasource(
-        instance_url=mastodon_config.instance_url,
-        access_token=mastodon_config.access_token,
-    )
+    datasource_mode = pipeline_config["datasource_mode"]
+    if datasource_mode == "polling":
+        datasource: BaseDatasource = MastodonPollingDatasource(
+            instance_url=mastodon_config.instance_url,
+            access_token=mastodon_config.access_token,
+            poll_interval=pipeline_config["poll_interval_seconds"],
+        )
+    else:
+        datasource = MastodonDatasource(
+            instance_url=mastodon_config.instance_url,
+            access_token=mastodon_config.access_token,
+        )
 
     extractor = TopicExtractor(
         api_key=extractor_config.api_key,
