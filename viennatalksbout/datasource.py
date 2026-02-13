@@ -40,6 +40,11 @@ class BaseDatasource(ABC):
     authentication, streaming protocols, and reconnection.
     """
 
+    @property
+    @abstractmethod
+    def source_id(self) -> str:
+        """Unique identifier for this datasource (e.g. 'mastodon:wien.rocks')."""
+
     @abstractmethod
     def start(
         self,

@@ -33,10 +33,11 @@ DEFAULT_MAX_RETRIES = 3
 DEFAULT_INITIAL_BACKOFF = 1.0  # seconds
 
 SYSTEM_PROMPT = (
-    "You are analyzing social media posts from Vienna, Austria "
-    "(from the wien.rocks Mastodon instance). "
+    "You are analyzing posts about Vienna, Austria from multiple sources "
+    "(social media, news headlines, press releases). "
     "The posts are primarily in German.\n\n"
-    "Extract the specific topics that people are discussing. "
+    "Extract the specific topics that people are discussing "
+    "or that are being reported on. "
     "Return concrete, specific topic terms "
     '(e.g. "Donauinselfest", "U2 Störung", "Wiener Linien") '
     "— NOT broad categories like \"politics\" or \"weather\".\n\n"

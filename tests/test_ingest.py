@@ -191,7 +191,7 @@ class TestPipelineOnPost:
         store = TopicStore(snapshot_dir=tmp_path / "snapshots")
         health = HealthMonitor()
         return IngestionPipeline(
-            datasource=ds,
+            datasources=[ds],
             buffer=buffer,
             extractor=extractor,
             store=store,
@@ -234,7 +234,7 @@ class TestPipelineOnBatch:
         store = TopicStore(snapshot_dir=tmp_path / "snapshots")
         health = HealthMonitor()
         return IngestionPipeline(
-            datasource=ds,
+            datasources=[ds],
             buffer=buffer,
             extractor=extractor,
             store=store,
@@ -311,7 +311,7 @@ class TestPipelineShutdown:
         store = TopicStore(snapshot_dir=tmp_path / "snapshots")
         health = HealthMonitor()
         return IngestionPipeline(
-            datasource=ds,
+            datasources=[ds],
             buffer=buffer,
             extractor=extractor,
             store=store,
@@ -321,7 +321,7 @@ class TestPipelineShutdown:
     def test_stop_stops_datasource(self, tmp_path: Path):
         pipeline = self._make_pipeline(tmp_path)
         pipeline.stop()
-        pipeline._datasource.stop.assert_called_once()
+        pipeline._datasources[0].stop.assert_called_once()
 
     def test_stop_stops_buffer(self, tmp_path: Path):
         pipeline = self._make_pipeline(tmp_path)
@@ -349,7 +349,7 @@ class TestPipelineShutdown:
         """Datasource should stop before buffer to avoid new posts during flush."""
         pipeline = self._make_pipeline(tmp_path)
         call_order = []
-        pipeline._datasource.stop.side_effect = lambda: call_order.append(
+        pipeline._datasources[0].stop.side_effect = lambda: call_order.append(
             "datasource"
         )
         pipeline._buffer.stop.side_effect = lambda: call_order.append("buffer")
@@ -358,7 +358,7 @@ class TestPipelineShutdown:
 
     def test_stop_handles_datasource_error(self, tmp_path: Path):
         pipeline = self._make_pipeline(tmp_path)
-        pipeline._datasource.stop.side_effect = RuntimeError("Stream error")
+        pipeline._datasources[0].stop.side_effect = RuntimeError("Stream error")
         # Should not raise
         pipeline.stop()
         # Buffer should still be stopped
@@ -397,7 +397,7 @@ class TestPipelineLifecycle:
         store = TopicStore(snapshot_dir=tmp_path / "snapshots")
         health = HealthMonitor()
         return IngestionPipeline(
-            datasource=ds,
+            datasources=[ds],
             buffer=buffer,
             extractor=extractor,
             store=store,
@@ -419,9 +419,9 @@ class TestPipelineLifecycle:
         pipeline.start()
         stop_thread.join(timeout=2)
 
-        pipeline._datasource.start.assert_called_once()
+        pipeline._datasources[0].start.assert_called_once()
         pipeline._buffer.start.assert_called_once()
-        pipeline._datasource.stop.assert_called_once()
+        pipeline._datasources[0].stop.assert_called_once()
         pipeline._buffer.stop.assert_called_once()
 
     def test_start_wires_callbacks(self, tmp_path: Path):
@@ -437,7 +437,7 @@ class TestPipelineLifecycle:
         pipeline.start()
         stop_thread.join(timeout=2)
 
-        call_args = pipeline._datasource.start.call_args
+        call_args = pipeline._datasources[0].start.call_args
         assert call_args[0][0] == pipeline._on_post
         assert call_args[1]["on_error"] == pipeline._on_stream_error
 
@@ -474,7 +474,7 @@ class TestPipelineIntegration:
         )
 
         pipeline = IngestionPipeline(
-            datasource=ds,
+            datasources=[ds],
             buffer=buffer,
             extractor=extractor,
             store=store,
@@ -530,7 +530,7 @@ class TestPipelineIntegration:
         )
 
         pipeline = IngestionPipeline(
-            datasource=ds,
+            datasources=[ds],
             buffer=buffer,
             extractor=extractor,
             store=store,
@@ -575,7 +575,7 @@ class TestPipelineIntegration:
         )
 
         pipeline = IngestionPipeline(
-            datasource=ds,
+            datasources=[ds],
             buffer=buffer,
             extractor=extractor,
             store=store,
@@ -678,7 +678,7 @@ class TestBuildPipeline:
         with patch("viennatalksbout.extractor.anthropic.Anthropic"):
             pipeline = build_pipeline()
 
-        assert isinstance(pipeline._datasource, MastodonDatasource)
+        assert isinstance(pipeline._datasources[0], MastodonDatasource)
 
     def test_build_pipeline_polling_mode_creates_polling_datasource(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -696,8 +696,8 @@ class TestBuildPipeline:
         with patch("viennatalksbout.extractor.anthropic.Anthropic"):
             pipeline = build_pipeline()
 
-        assert isinstance(pipeline._datasource, MastodonPollingDatasource)
-        assert pipeline._datasource._poll_interval == 15
+        assert isinstance(pipeline._datasources[0], MastodonPollingDatasource)
+        assert pipeline._datasources[0]._poll_interval == 15
 
 
 # ===========================================================================
@@ -717,7 +717,7 @@ class TestPipelineOnPostWithDB:
         health = HealthMonitor()
         db = PostDatabase(tmp_path / "test.db")
         return IngestionPipeline(
-            datasource=ds,
+            datasources=[ds],
             buffer=buffer,
             extractor=extractor,
             store=store,
@@ -768,7 +768,7 @@ class TestPipelineOnBatchWithDB:
         health = HealthMonitor()
         db = PostDatabase(tmp_path / "test.db")
         return IngestionPipeline(
-            datasource=ds,
+            datasources=[ds],
             buffer=buffer,
             extractor=extractor,
             store=store,
@@ -812,7 +812,7 @@ class TestPipelineRecovery:
         health = HealthMonitor()
         db = PostDatabase(tmp_path / "test.db")
         return IngestionPipeline(
-            datasource=ds,
+            datasources=[ds],
             buffer=buffer,
             extractor=extractor,
             store=store,
@@ -920,3 +920,121 @@ class TestBuildPipelineDB:
         monkeypatch.setenv("VIENNATALKSBOUT_DB_PATH", "/tmp/custom.db")
         config = load_pipeline_config()
         assert config["db_path"] == "/tmp/custom.db"
+
+
+# ===========================================================================
+# Multi-datasource start / stop
+# ===========================================================================
+
+
+class TestMultiDatasource:
+    """Tests for multi-datasource support in IngestionPipeline."""
+
+    def test_multi_datasource_start_all(self, tmp_path: Path):
+        """All datasources should be started."""
+        ds1 = MagicMock(spec=MastodonDatasource)
+        ds1.source_id = "mastodon:wien.rocks"
+        ds2 = MagicMock()
+        ds2.source_id = "news:rss"
+        buffer = MagicMock(spec=PostBuffer)
+        extractor = MagicMock(spec=TopicExtractor)
+        store = TopicStore(snapshot_dir=tmp_path / "snapshots")
+        health = HealthMonitor()
+
+        pipeline = IngestionPipeline(
+            datasources=[ds1, ds2],
+            buffer=buffer,
+            extractor=extractor,
+            store=store,
+            health=health,
+            health_log_interval=9999,
+        )
+
+        def send_stop():
+            time.sleep(0.1)
+            pipeline._stop_event.set()
+
+        stop_thread = threading.Thread(target=send_stop)
+        stop_thread.start()
+        pipeline.start()
+        stop_thread.join(timeout=2)
+
+        ds1.start.assert_called_once()
+        ds2.start.assert_called_once()
+
+    def test_multi_datasource_stop_all(self, tmp_path: Path):
+        """All datasources should be stopped, even if one raises."""
+        ds1 = MagicMock(spec=MastodonDatasource)
+        ds1.source_id = "mastodon:wien.rocks"
+        ds1.stop.side_effect = RuntimeError("boom")
+        ds2 = MagicMock()
+        ds2.source_id = "news:rss"
+        buffer = MagicMock(spec=PostBuffer)
+        extractor = MagicMock(spec=TopicExtractor)
+        store = TopicStore(snapshot_dir=tmp_path / "snapshots")
+        health = HealthMonitor()
+
+        pipeline = IngestionPipeline(
+            datasources=[ds1, ds2],
+            buffer=buffer,
+            extractor=extractor,
+            store=store,
+            health=health,
+        )
+
+        pipeline.stop()
+
+        ds1.stop.assert_called_once()
+        ds2.stop.assert_called_once()
+
+
+# ===========================================================================
+# build_pipeline with RSS config
+# ===========================================================================
+
+
+class TestBuildPipelineRss:
+    """Tests for RSS wiring in build_pipeline()."""
+
+    def test_build_pipeline_rss_disabled(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """RSS_ENABLED=false (default) should produce only Mastodon datasource."""
+        monkeypatch.setenv("MASTODON_INSTANCE_URL", "https://wien.rocks")
+        monkeypatch.setenv("MASTODON_CLIENT_ID", "test_client_id")
+        monkeypatch.setenv("MASTODON_CLIENT_SECRET", "test_client_secret")
+        monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "test_access_token")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+        monkeypatch.setenv("VIENNATALKSBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots"))
+        monkeypatch.setenv("MASTODON_DATASOURCE_MODE", "stream")
+        monkeypatch.delenv("RSS_ENABLED", raising=False)
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
+
+        with patch("viennatalksbout.extractor.anthropic.Anthropic"):
+            pipeline = build_pipeline()
+
+        assert len(pipeline._datasources) == 1
+        assert isinstance(pipeline._datasources[0], MastodonDatasource)
+
+    def test_build_pipeline_rss_enabled(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """RSS_ENABLED=true should add RssDatasource alongside Mastodon."""
+        from viennatalksbout.news.rss import RssDatasource
+
+        monkeypatch.setenv("MASTODON_INSTANCE_URL", "https://wien.rocks")
+        monkeypatch.setenv("MASTODON_CLIENT_ID", "test_client_id")
+        monkeypatch.setenv("MASTODON_CLIENT_SECRET", "test_client_secret")
+        monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "test_access_token")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+        monkeypatch.setenv("VIENNATALKSBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots"))
+        monkeypatch.setenv("MASTODON_DATASOURCE_MODE", "stream")
+        monkeypatch.setenv("RSS_ENABLED", "true")
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
+
+        with patch("viennatalksbout.extractor.anthropic.Anthropic"):
+            pipeline = build_pipeline()
+
+        assert len(pipeline._datasources) == 2
+        assert isinstance(pipeline._datasources[0], MastodonDatasource)
+        assert isinstance(pipeline._datasources[1], RssDatasource)

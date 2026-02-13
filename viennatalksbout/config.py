@@ -62,6 +62,101 @@ class ExtractorConfig:
         return errors
 
 
+DEFAULT_RSS_FEEDS = (
+    ("https://rss.orf.at/wien.xml", "orf-wien"),
+    ("https://rss.orf.at/news.xml", "orf-news"),
+    ("http://www.vienna.at/rss", "vienna-at"),
+    ("https://www.ots.at/rss/index", "ots"),
+)
+
+
+@dataclass(frozen=True)
+class FeedConfig:
+    """Configuration for a single RSS feed."""
+
+    url: str
+    name: str
+    language: str = "de"
+
+
+@dataclass(frozen=True)
+class RssConfig:
+    """Configuration for the RSS news datasource.
+
+    Attributes:
+        feeds: Tuple of feed configurations to poll.
+        poll_interval: Seconds between poll cycles.
+        user_agent: User-Agent header for HTTP requests.
+        enabled: Whether the RSS datasource is active.
+    """
+
+    feeds: tuple[FeedConfig, ...]
+    poll_interval: int = 600
+    user_agent: str = "ViennaTalksBout/1.0"
+    enabled: bool = True
+
+    def validate(self) -> list[str]:
+        """Return a list of validation error messages. Empty list means valid."""
+        errors: list[str] = []
+        if not self.enabled:
+            return errors
+        if not self.feeds:
+            errors.append("RSS_FEEDS must not be empty when RSS is enabled")
+        if self.poll_interval <= 0:
+            errors.append("RSS_POLL_INTERVAL must be positive")
+        return errors
+
+
+def load_rss_config() -> RssConfig:
+    """Load RSS datasource configuration from environment variables.
+
+    Environment variables:
+        RSS_ENABLED: "true" to enable (default "false").
+        RSS_FEEDS: Comma-separated "url|name" pairs (default: Tier 1 Vienna feeds).
+        RSS_POLL_INTERVAL: Seconds between polls (default 600).
+        RSS_USER_AGENT: User-Agent header (default "ViennaTalksBout/1.0").
+
+    Returns:
+        An RssConfig instance.
+
+    Raises:
+        ValueError: If the configuration is invalid when enabled.
+    """
+    enabled = os.environ.get("RSS_ENABLED", "false").strip().lower() == "true"
+
+    feeds_raw = os.environ.get("RSS_FEEDS", "").strip()
+    if feeds_raw:
+        feeds = []
+        for pair in feeds_raw.split(","):
+            pair = pair.strip()
+            if "|" in pair:
+                url, name = pair.split("|", 1)
+                feeds.append(FeedConfig(url=url.strip(), name=name.strip()))
+        feeds_tuple = tuple(feeds)
+    else:
+        feeds_tuple = tuple(
+            FeedConfig(url=url, name=name) for url, name in DEFAULT_RSS_FEEDS
+        )
+
+    poll_interval = int(os.environ.get("RSS_POLL_INTERVAL", "600").strip())
+    user_agent = os.environ.get("RSS_USER_AGENT", "ViennaTalksBout/1.0").strip()
+
+    config = RssConfig(
+        feeds=feeds_tuple,
+        poll_interval=poll_interval,
+        user_agent=user_agent,
+        enabled=enabled,
+    )
+
+    errors = config.validate()
+    if errors:
+        raise ValueError(
+            "Invalid RSS configuration:\n" + "\n".join(f"  - {e}" for e in errors)
+        )
+
+    return config
+
+
 def load_config(env_path: str | Path | None = None) -> MastodonConfig:
     """Load Mastodon configuration from environment variables.
 

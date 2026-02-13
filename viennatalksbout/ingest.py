@@ -2,7 +2,7 @@
 
 Wires all components into a running pipeline:
 
-    Mastodon SSE stream → PostBuffer → TopicExtractor → TopicStore
+    Datasources (Mastodon, RSS, ...) → PostBuffer → TopicExtractor → TopicStore
 
 Run with ``python -m viennatalksbout.ingest``.
 """
@@ -17,12 +17,13 @@ from pathlib import Path
 from types import FrameType
 
 from viennatalksbout.buffer import PostBatch, PostBuffer
-from viennatalksbout.config import load_config, load_extractor_config
+from viennatalksbout.config import load_config, load_extractor_config, load_rss_config
 from viennatalksbout.datasource import BaseDatasource, Post
 from viennatalksbout.extractor import TopicExtractor
 from viennatalksbout.health import HealthMonitor
 from viennatalksbout.mastodon.polling import MastodonPollingDatasource
 from viennatalksbout.mastodon.stream import MastodonDatasource
+from viennatalksbout.news.rss import RssDatasource
 from viennatalksbout.persistence import PostDatabase
 from viennatalksbout.store import TopicStore
 
@@ -114,13 +115,13 @@ def load_pipeline_config() -> dict:
 class IngestionPipeline:
     """Orchestrates the full ingestion pipeline.
 
-    Wires: MastodonDatasource → PostBuffer → TopicExtractor → TopicStore
+    Wires: Datasources → PostBuffer → TopicExtractor → TopicStore
 
     Handles signal-based graceful shutdown, periodic health logging,
     and periodic snapshot saving.
 
     Args:
-        datasource: The streaming datasource (Mastodon).
+        datasources: One or more datasources feeding the pipeline.
         buffer: The post buffer for batching.
         extractor: The Claude-powered topic extractor.
         store: The topic store with lifecycle management.
@@ -131,7 +132,7 @@ class IngestionPipeline:
 
     def __init__(
         self,
-        datasource: BaseDatasource,
+        datasources: list[BaseDatasource],
         buffer: PostBuffer,
         extractor: TopicExtractor,
         store: TopicStore,
@@ -139,7 +140,7 @@ class IngestionPipeline:
         health_log_interval: float = DEFAULT_HEALTH_LOG_INTERVAL,
         db: PostDatabase | None = None,
     ) -> None:
-        self._datasource = datasource
+        self._datasources = datasources
         self._buffer = buffer
         self._extractor = extractor
         self._store = store
@@ -274,10 +275,9 @@ class IngestionPipeline:
         if self._db is not None:
             self._recover_unprocessed_posts()
 
-        self._datasource.start(self._on_post, on_error=self._on_stream_error)
-        logger.info(
-            "Streaming from %s", self._datasource.source_id
-        )
+        for ds in self._datasources:
+            ds.start(self._on_post, on_error=self._on_stream_error)
+            logger.info("Started datasource: %s", ds.source_id)
 
         # Start periodic health logging
         self._schedule_health_log()
@@ -301,12 +301,13 @@ class IngestionPipeline:
         """
         logger.info("Shutting down pipeline...")
 
-        # Stop the datasource first (no more incoming posts)
-        try:
-            self._datasource.stop()
-            logger.info("Datasource stopped")
-        except Exception:
-            logger.exception("Error stopping datasource")
+        # Stop all datasources first (no more incoming posts)
+        for ds in self._datasources:
+            try:
+                ds.stop()
+                logger.info("Datasource stopped: %s", ds.source_id)
+            except Exception:
+                logger.exception("Error stopping datasource %s", ds.source_id)
 
         # Stop buffer (triggers final flush → extractor → store)
         try:
@@ -375,18 +376,33 @@ def build_pipeline() -> IngestionPipeline:
         pipeline_config["snapshot_dir"],
     )
 
+    # Build datasource list
+    datasources: list[BaseDatasource] = []
+
     datasource_mode = pipeline_config["datasource_mode"]
     if datasource_mode == "polling":
-        datasource: BaseDatasource = MastodonPollingDatasource(
+        mastodon_ds: BaseDatasource = MastodonPollingDatasource(
             instance_url=mastodon_config.instance_url,
             access_token=mastodon_config.access_token,
             poll_interval=pipeline_config["poll_interval_seconds"],
         )
     else:
-        datasource = MastodonDatasource(
+        mastodon_ds = MastodonDatasource(
             instance_url=mastodon_config.instance_url,
             access_token=mastodon_config.access_token,
         )
+    datasources.append(mastodon_ds)
+
+    # Optionally add RSS datasource
+    rss_config = load_rss_config()
+    if rss_config.enabled:
+        rss_ds = RssDatasource(
+            feeds=list(rss_config.feeds),
+            poll_interval=rss_config.poll_interval,
+            user_agent=rss_config.user_agent,
+        )
+        datasources.append(rss_ds)
+        logger.info("RSS datasource enabled with %d feeds", len(rss_config.feeds))
 
     extractor = TopicExtractor(
         api_key=extractor_config.api_key,
@@ -402,9 +418,12 @@ def build_pipeline() -> IngestionPipeline:
         stale_stream_seconds=pipeline_config["stale_stream_seconds"],
     )
 
+    buffer_source = (
+        datasources[0].source_id if len(datasources) == 1 else "multi"
+    )
     buffer = PostBuffer(
         window_seconds=pipeline_config["buffer_window_seconds"],
-        source=datasource.source_id,
+        source=buffer_source,
         on_batch=None,  # Will be set after pipeline creation
         max_batch_size=pipeline_config["buffer_max_batch_size"],
     )
@@ -413,7 +432,7 @@ def build_pipeline() -> IngestionPipeline:
     db = PostDatabase(db_path) if db_path else None
 
     pipeline = IngestionPipeline(
-        datasource=datasource,
+        datasources=datasources,
         buffer=buffer,
         extractor=extractor,
         store=store,
