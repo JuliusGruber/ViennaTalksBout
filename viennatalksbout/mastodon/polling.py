@@ -34,13 +34,14 @@ class MastodonPollingDatasource(BaseDatasource):
         instance_url: str,
         access_token: str | None = None,
         poll_interval: float = DEFAULT_POLL_INTERVAL,
+        initial_since_id: str | None = None,
     ) -> None:
         self._instance_url = instance_url.rstrip("/")
         self._access_token = access_token
         self._poll_interval = poll_interval
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
-        self._since_id: str | None = None
+        self._since_id: str | None = initial_since_id
 
     @property
     def source_id(self) -> str:
@@ -123,6 +124,9 @@ class MastodonPollingDatasource(BaseDatasource):
             post = parse_status(validated, self.source_id)
             logger.info("Post received via polling: id=%s lang=%s source=%s", post.id, post.language, post.source)
             on_post(post)
+
+        if not statuses:
+            logger.info("Poll cycle complete: 0 new posts (since_id=%s)", self._since_id)
 
         # Track the newest id for the next poll
         if statuses:

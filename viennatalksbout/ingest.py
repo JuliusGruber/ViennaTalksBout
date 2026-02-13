@@ -169,7 +169,7 @@ class IngestionPipeline:
         if self._db is not None:
             is_new = self._db.save_post(post)
             if not is_new:
-                logger.debug("Duplicate post skipped: %s", post.id)
+                logger.info("Duplicate post skipped: %s", post.id)
                 return
         self._buffer.add_post(post)
         logger.debug("Post received: %s (source=%s)", post.id, post.source)
@@ -376,15 +376,23 @@ def build_pipeline() -> IngestionPipeline:
         pipeline_config["snapshot_dir"],
     )
 
+    db_path = pipeline_config["db_path"]
+    db = PostDatabase(db_path) if db_path else None
+
     # Build datasource list
     datasources: list[BaseDatasource] = []
 
     datasource_mode = pipeline_config["datasource_mode"]
     if datasource_mode == "polling":
+        # Recover since_id from database so restarts skip already-seen posts
+        initial_since_id = db.get_max_post_id() if db is not None else None
+        if initial_since_id:
+            logger.info("Resuming polling from since_id=%s", initial_since_id)
         mastodon_ds: BaseDatasource = MastodonPollingDatasource(
             instance_url=mastodon_config.instance_url,
             access_token=mastodon_config.access_token,
             poll_interval=pipeline_config["poll_interval_seconds"],
+            initial_since_id=initial_since_id,
         )
     else:
         mastodon_ds = MastodonDatasource(
@@ -427,9 +435,6 @@ def build_pipeline() -> IngestionPipeline:
         on_batch=None,  # Will be set after pipeline creation
         max_batch_size=pipeline_config["buffer_max_batch_size"],
     )
-
-    db_path = pipeline_config["db_path"]
-    db = PostDatabase(db_path) if db_path else None
 
     pipeline = IngestionPipeline(
         datasources=datasources,

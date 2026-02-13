@@ -107,6 +107,11 @@ class PostDatabase:
             )
             self._conn.commit()
 
+    def get_max_post_id(self) -> str | None:
+        """Return the highest post ID in the database, or None if empty."""
+        row = self._conn.execute("SELECT MAX(id) FROM posts").fetchone()
+        return row[0] if row and row[0] is not None else None
+
     def cleanup_old_posts(self, retention_hours: int = 48) -> int:
         """Delete processed posts older than *retention_hours*.
 
