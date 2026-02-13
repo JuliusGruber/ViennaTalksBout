@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ViennaTalksBout</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0f0f1a;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  header {
+    text-align: center;
+    padding: 2rem 1rem 1rem;
+  }
+
+  header h1 {
+    font-size: 2rem;
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    color: #ffffff;
+  }
+
+  header p {
+    font-size: 0.85rem;
+    color: #888;
+    margin-top: 0.3rem;
+  }
+
+  #tag-cloud {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    gap: 0.8rem 1.2rem;
+    max-width: 900px;
+    padding: 2rem 1rem;
+    min-height: 300px;
+  }
+
+  .topic {
+    display: inline-block;
+    padding: 0.3em 0.6em;
+    border-radius: 4px;
+    cursor: default;
+    white-space: nowrap;
+    transition: all 0.8s ease;
+  }
+
+  .topic.entering {
+    animation: fadeIn 0.8s ease forwards;
+    color: #8ecae6;
+  }
+
+  .topic.growing {
+    color: #ffffff;
+    text-shadow: 0 0 8px rgba(142, 202, 230, 0.4);
+  }
+
+  .topic.shrinking {
+    color: #666;
+    opacity: 0.6;
+  }
+
+  .topic.removing {
+    animation: fadeOut 0.8s ease forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.5); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes fadeOut {
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(0.5); }
+  }
+
+  footer {
+    width: 100%;
+    max-width: 900px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  #time-slider {
+    flex: 1;
+    accent-color: #8ecae6;
+  }
+
+  #slider-label {
+    font-size: 0.8rem;
+    color: #888;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  #health-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #444;
+    flex-shrink: 0;
+  }
+
+  #health-dot.ok { background: #2ecc71; }
+  #health-dot.stale { background: #e74c3c; }
+
+  #empty-msg {
+    color: #555;
+    font-style: italic;
+    font-size: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ViennaTalksBout</h1>
+  <p>Trending topics in Vienna right now</p>
+</header>
+
+<div id="tag-cloud">
+  <span id="empty-msg">Waiting for topics&hellip;</span>
+</div>
+
+<footer>
+  <span id="slider-label">Live</span>
+  <input type="range" id="time-slider" min="0" max="23" value="23" step="1">
+  <span id="health-dot" title="Pipeline health"></span>
+</footer>
+
+<script>
+(function () {
+  const cloud = document.getElementById('tag-cloud');
+  const emptyMsg = document.getElementById('empty-msg');
+  const slider = document.getElementById('time-slider');
+  const sliderLabel = document.getElementById('slider-label');
+  const healthDot = document.getElementById('health-dot');
+
+  const currentTopics = new Map();
+  let isLive = true;
+  let pollTimer = null;
+  const POLL_INTERVAL = 15000;
+
+  function scoreFontSize(score) {
+    const minRem = 0.9;
+    const maxRem = 3.5;
+    return minRem + (maxRem - minRem) * Math.max(0, Math.min(1, score));
+  }
+
+  function renderTopics(topics) {
+    const incoming = new Map();
+    topics.forEach(function (t) { incoming.set(t.name, t); });
+
+    // Remove disappeared topics
+    currentTopics.forEach(function (_, name) {
+      if (!incoming.has(name)) {
+        var el = document.getElementById('topic-' + CSS.escape(name));
+        if (el) {
+          el.className = 'topic removing';
+          setTimeout(function () { el.remove(); }, 800);
+        }
+        currentTopics.delete(name);
+      }
+    });
+
+    // Add or update topics
+    incoming.forEach(function (t, name) {
+      var el = document.getElementById('topic-' + CSS.escape(name));
+      if (el) {
+        el.style.fontSize = scoreFontSize(t.score) + 'rem';
+        el.className = 'topic ' + t.state;
+      } else {
+        el = document.createElement('span');
+        el.id = 'topic-' + CSS.escape(name);
+        el.className = 'topic ' + t.state;
+        el.textContent = t.name;
+        el.style.fontSize = scoreFontSize(t.score) + 'rem';
+        cloud.appendChild(el);
+      }
+      currentTopics.set(name, t);
+    });
+
+    // Show/hide empty message
+    if (emptyMsg) {
+      emptyMsg.style.display = currentTopics.size === 0 ? '' : 'none';
+    }
+  }
+
+  function clearCloud() {
+    currentTopics.clear();
+    cloud.querySelectorAll('.topic').forEach(function (el) { el.remove(); });
+    if (emptyMsg) emptyMsg.style.display = '';
+  }
+
+  async function fetchTopics(hour) {
+    var url = '/api/topics';
+    if (hour !== undefined && hour !== null) {
+      url += '?hour=' + hour;
+    }
+    var resp = await fetch(url);
+    if (!resp.ok) return [];
+    return await resp.json();
+  }
+
+  async function fetchHealth() {
+    try {
+      var resp = await fetch('/api/health');
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function poll() {
+    if (!isLive) return;
+    try {
+      var topics = await fetchTopics();
+      renderTopics(topics);
+      var health = await fetchHealth();
+      if (health) {
+        healthDot.className = health.stream_stale ? 'stale' : 'ok';
+        healthDot.className = 'health-dot ' + (health.stream_stale ? 'stale' : 'ok');
+        // Use id-based styling
+        healthDot.classList.remove('ok', 'stale');
+        healthDot.classList.add(health.stream_stale ? 'stale' : 'ok');
+      }
+    } catch (e) {
+      console.error('Poll error:', e);
+    }
+    pollTimer = setTimeout(poll, POLL_INTERVAL);
+  }
+
+  function startPolling() {
+    if (pollTimer) clearTimeout(pollTimer);
+    isLive = true;
+    poll();
+  }
+
+  function stopPolling() {
+    isLive = false;
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  }
+
+  // Slider: rightmost position = live, others = historical hours
+  slider.addEventListener('input', async function () {
+    var hour = parseInt(slider.value, 10);
+    var now = new Date();
+    var currentHour = now.getHours();
+
+    if (hour === currentHour) {
+      sliderLabel.textContent = 'Live';
+      clearCloud();
+      startPolling();
+    } else {
+      stopPolling();
+      sliderLabel.textContent = String(hour).padStart(2, '0') + ':00';
+      clearCloud();
+      var topics = await fetchTopics(hour);
+      renderTopics(topics);
+    }
+  });
+
+  // Initialize slider to current hour
+  var nowHour = new Date().getHours();
+  slider.value = nowHour;
+  sliderLabel.textContent = 'Live';
+
+  // Start live polling
+  startPolling();
+})();
+</script>
+
+</body>
+</html>

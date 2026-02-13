@@ -1,11 +1,15 @@
 """ViennaTalksBout CLI entry point.
 
 Usage:
-    python -m viennatalksbout          # Full ingestion pipeline (stream → extract → store)
-    python -m viennatalksbout.ingest   # Same as above (explicit module)
+    python -m viennatalksbout            # Web UI + pipeline (default)
+    python -m viennatalksbout --ingest   # Pipeline-only mode (no web server)
 """
 
-from viennatalksbout.ingest import main
+import sys
 
-if __name__ == "__main__":
-    main()
+if "--ingest" in sys.argv:
+    from viennatalksbout.ingest import main
+else:
+    from viennatalksbout.web import main
+
+main()

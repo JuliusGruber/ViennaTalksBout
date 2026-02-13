@@ -219,20 +219,26 @@ class IngestionPipeline:
         self._health.check_and_log()
         self._schedule_health_log()
 
-    def start(self) -> None:
+    def start(self, install_signal_handlers: bool = True) -> None:
         """Start the pipeline and block until shutdown is requested.
 
-        Installs signal handlers for SIGINT and SIGTERM, starts the
-        datasource, buffer, and health logging, then waits for the
-        stop event.
+        Installs signal handlers for SIGINT and SIGTERM (unless disabled),
+        starts the datasource, buffer, and health logging, then waits for
+        the stop event.
+
+        Args:
+            install_signal_handlers: If False, skip signal handler
+                installation. Set to False when running in a non-main
+                thread (e.g. behind a web server).
         """
         logger.info("Starting ViennaTalksBout ingestion pipeline")
 
-        # Install signal handlers
-        self._original_sigint = signal.getsignal(signal.SIGINT)
-        self._original_sigterm = signal.getsignal(signal.SIGTERM)
-        signal.signal(signal.SIGINT, self._on_signal)
-        signal.signal(signal.SIGTERM, self._on_signal)
+        # Install signal handlers (only from the main thread)
+        if install_signal_handlers:
+            self._original_sigint = signal.getsignal(signal.SIGINT)
+            self._original_sigterm = signal.getsignal(signal.SIGTERM)
+            signal.signal(signal.SIGINT, self._on_signal)
+            signal.signal(signal.SIGTERM, self._on_signal)
 
         # Start components
         self._buffer.start()
@@ -294,11 +300,14 @@ class IngestionPipeline:
         # Final health report
         self._health.check_and_log()
 
-        # Restore original signal handlers
-        if self._original_sigint is not None:
-            signal.signal(signal.SIGINT, self._original_sigint)
-        if self._original_sigterm is not None:
-            signal.signal(signal.SIGTERM, self._original_sigterm)
+        # Restore original signal handlers (may fail from non-main thread)
+        try:
+            if self._original_sigint is not None:
+                signal.signal(signal.SIGINT, self._original_sigint)
+            if self._original_sigterm is not None:
+                signal.signal(signal.SIGTERM, self._original_sigterm)
+        except ValueError:
+            pass  # Not in main thread — signal restoration not possible
 
         logger.info("Pipeline shutdown complete")
 
