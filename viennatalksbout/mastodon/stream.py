@@ -176,6 +176,7 @@ class ViennaTalksBoutStreamListener(StreamListener):
             return
 
         post = parse_status(validated, self._source)
+        logger.info("Post received via stream: id=%s lang=%s source=%s", post.id, post.language, post.source)
         self._on_post(post)
 
     def on_abort(self, err: Exception) -> None:
