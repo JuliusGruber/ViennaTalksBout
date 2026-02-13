@@ -23,6 +23,7 @@ from viennatalksbout.extractor import TopicExtractor
 from viennatalksbout.health import HealthMonitor
 from viennatalksbout.mastodon.polling import MastodonPollingDatasource
 from viennatalksbout.mastodon.stream import MastodonDatasource
+from viennatalksbout.persistence import PostDatabase
 from viennatalksbout.store import TopicStore
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,9 @@ def load_pipeline_config() -> dict:
                 str(DEFAULT_POLL_INTERVAL_SECONDS),
             )
         ),
+        "db_path": os.environ.get(
+            "VIENNATALKSBOUT_DB_PATH", "data/viennatalksbout.db"
+        ),
     }
 
 
@@ -122,6 +126,7 @@ class IngestionPipeline:
         store: The topic store with lifecycle management.
         health: The health monitor.
         health_log_interval: Seconds between health log entries.
+        db: Optional SQLite post database for persistence.
     """
 
     def __init__(
@@ -132,6 +137,7 @@ class IngestionPipeline:
         store: TopicStore,
         health: HealthMonitor,
         health_log_interval: float = DEFAULT_HEALTH_LOG_INTERVAL,
+        db: PostDatabase | None = None,
     ) -> None:
         self._datasource = datasource
         self._buffer = buffer
@@ -139,6 +145,7 @@ class IngestionPipeline:
         self._store = store
         self._health = health
         self._health_log_interval = health_log_interval
+        self._db = db
 
         self._stop_event = threading.Event()
         self._health_timer: threading.Timer | None = None
@@ -158,6 +165,11 @@ class IngestionPipeline:
     def _on_post(self, post: Post) -> None:
         """Callback: datasource received a post → add to buffer."""
         self._health.record_post()
+        if self._db is not None:
+            is_new = self._db.save_post(post)
+            if not is_new:
+                logger.debug("Duplicate post skipped: %s", post.id)
+                return
         self._buffer.add_post(post)
         logger.debug("Post received: %s (source=%s)", post.id, post.source)
 
@@ -194,9 +206,23 @@ class IngestionPipeline:
         self._store.save_snapshot()
         self._store.cleanup_snapshots()
 
+        # Mark posts as processed in the database
+        if self._db is not None:
+            post_ids = [p.id for p in batch.posts]
+            self._db.mark_batch_processed(post_ids)
+
     def _on_stream_error(self, err: Exception) -> None:
         """Callback: stream encountered an error."""
         logger.error("Stream error: %s", err)
+
+    def _recover_unprocessed_posts(self) -> None:
+        """Re-inject unprocessed posts from a previous run into the buffer."""
+        assert self._db is not None
+        posts = self._db.get_unprocessed_posts()
+        if posts:
+            for post in posts:
+                self._buffer.add_post(post)
+            logger.info("Recovered %d unprocessed posts from database", len(posts))
 
     def _on_signal(self, signum: int, frame: FrameType | None) -> None:
         """Signal handler for graceful shutdown."""
@@ -243,6 +269,10 @@ class IngestionPipeline:
         # Start components
         self._buffer.start()
         logger.info("Post buffer started")
+
+        # Recover unprocessed posts from previous runs
+        if self._db is not None:
+            self._recover_unprocessed_posts()
 
         self._datasource.start(self._on_post, on_error=self._on_stream_error)
         logger.info(
@@ -299,6 +329,15 @@ class IngestionPipeline:
 
         # Final health report
         self._health.check_and_log()
+
+        # Cleanup and close database
+        if self._db is not None:
+            try:
+                self._db.cleanup_old_posts()
+                self._db.close()
+                logger.info("Database cleaned up and closed")
+            except Exception:
+                logger.exception("Error closing database")
 
         # Restore original signal handlers (may fail from non-main thread)
         try:
@@ -370,6 +409,9 @@ def build_pipeline() -> IngestionPipeline:
         max_batch_size=pipeline_config["buffer_max_batch_size"],
     )
 
+    db_path = pipeline_config["db_path"]
+    db = PostDatabase(db_path) if db_path else None
+
     pipeline = IngestionPipeline(
         datasource=datasource,
         buffer=buffer,
@@ -377,6 +419,7 @@ def build_pipeline() -> IngestionPipeline:
         store=store,
         health=health,
         health_log_interval=pipeline_config["health_log_interval"],
+        db=db,
     )
 
     # Wire the buffer's on_batch callback to the pipeline

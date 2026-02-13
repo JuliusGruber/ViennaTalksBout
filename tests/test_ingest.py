@@ -42,6 +42,7 @@ from viennatalksbout.ingest import (
 )
 from viennatalksbout.mastodon.polling import MastodonPollingDatasource
 from viennatalksbout.mastodon.stream import MastodonDatasource
+from viennatalksbout.persistence import PostDatabase
 from viennatalksbout.store import TopicStore
 
 
@@ -670,7 +671,9 @@ class TestBuildPipeline:
         monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "test_access_token")
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
         monkeypatch.setenv("VIENNATALKSBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots"))
-        monkeypatch.delenv("MASTODON_DATASOURCE_MODE", raising=False)
+        monkeypatch.setenv("MASTODON_DATASOURCE_MODE", "stream")
+        # Prevent load_dotenv from overriding monkeypatched env vars
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
 
         with patch("viennatalksbout.extractor.anthropic.Anthropic"):
             pipeline = build_pipeline()
@@ -695,3 +698,225 @@ class TestBuildPipeline:
 
         assert isinstance(pipeline._datasource, MastodonPollingDatasource)
         assert pipeline._datasource._poll_interval == 15
+
+
+# ===========================================================================
+# Persistence integration — _on_post with DB
+# ===========================================================================
+
+
+class TestPipelineOnPostWithDB:
+    """Tests for _on_post when a PostDatabase is configured."""
+
+    def _make_pipeline(self, tmp_path: Path) -> IngestionPipeline:
+        ds = MagicMock(spec=MastodonDatasource)
+        ds.source_id = "mastodon:wien.rocks"
+        buffer = MagicMock(spec=PostBuffer)
+        extractor = MagicMock(spec=TopicExtractor)
+        store = TopicStore(snapshot_dir=tmp_path / "snapshots")
+        health = HealthMonitor()
+        db = PostDatabase(tmp_path / "test.db")
+        return IngestionPipeline(
+            datasource=ds,
+            buffer=buffer,
+            extractor=extractor,
+            store=store,
+            health=health,
+            db=db,
+        )
+
+    def test_on_post_saves_to_db(self, tmp_path: Path):
+        pipeline = self._make_pipeline(tmp_path)
+        post = _make_post()
+        pipeline._on_post(post)
+        posts = pipeline._db.get_unprocessed_posts()
+        assert len(posts) == 1
+        assert posts[0].id == post.id
+
+    def test_on_post_skips_duplicate(self, tmp_path: Path):
+        pipeline = self._make_pipeline(tmp_path)
+        post = _make_post(id="dup")
+        pipeline._on_post(post)
+        pipeline._on_post(post)
+        # Buffer should only be called once (duplicate skipped)
+        assert pipeline._buffer.add_post.call_count == 1
+
+    def test_on_post_still_adds_to_buffer(self, tmp_path: Path):
+        pipeline = self._make_pipeline(tmp_path)
+        post = _make_post()
+        pipeline._on_post(post)
+        pipeline._buffer.add_post.assert_called_once_with(post)
+
+
+# ===========================================================================
+# Persistence integration — _on_batch with DB
+# ===========================================================================
+
+
+class TestPipelineOnBatchWithDB:
+    """Tests for _on_batch marking posts as processed."""
+
+    def _make_pipeline(
+        self, tmp_path: Path, extracted_topics=None
+    ) -> IngestionPipeline:
+        ds = MagicMock(spec=MastodonDatasource)
+        ds.source_id = "mastodon:wien.rocks"
+        buffer = MagicMock(spec=PostBuffer)
+        extractor = MagicMock(spec=TopicExtractor)
+        extractor.extract.return_value = extracted_topics or []
+        store = TopicStore(snapshot_dir=tmp_path / "snapshots")
+        health = HealthMonitor()
+        db = PostDatabase(tmp_path / "test.db")
+        return IngestionPipeline(
+            datasource=ds,
+            buffer=buffer,
+            extractor=extractor,
+            store=store,
+            health=health,
+            db=db,
+        )
+
+    def test_on_batch_marks_processed(self, tmp_path: Path):
+        topics = [ExtractedTopic(topic="Test", score=0.5, count=1)]
+        pipeline = self._make_pipeline(tmp_path, extracted_topics=topics)
+        post = _make_post(id="batch1")
+        pipeline._db.save_post(post)
+        batch = _make_batch(posts=(post,))
+        pipeline._on_batch(batch)
+        assert pipeline._db.get_unprocessed_posts() == []
+
+    def test_on_batch_marks_processed_on_failure(self, tmp_path: Path):
+        """Even if extraction returns nothing, posts are marked processed."""
+        pipeline = self._make_pipeline(tmp_path, extracted_topics=[])
+        post = _make_post(id="fail1")
+        pipeline._db.save_post(post)
+        batch = _make_batch(posts=(post,))
+        pipeline._on_batch(batch)
+        assert pipeline._db.get_unprocessed_posts() == []
+
+
+# ===========================================================================
+# Persistence integration — recovery on start
+# ===========================================================================
+
+
+class TestPipelineRecovery:
+    """Tests for unprocessed post recovery during start()."""
+
+    def _make_pipeline(self, tmp_path: Path) -> IngestionPipeline:
+        ds = MagicMock(spec=MastodonDatasource)
+        ds.source_id = "mastodon:wien.rocks"
+        buffer = MagicMock(spec=PostBuffer)
+        extractor = MagicMock(spec=TopicExtractor)
+        store = TopicStore(snapshot_dir=tmp_path / "snapshots")
+        health = HealthMonitor()
+        db = PostDatabase(tmp_path / "test.db")
+        return IngestionPipeline(
+            datasource=ds,
+            buffer=buffer,
+            extractor=extractor,
+            store=store,
+            health=health,
+            health_log_interval=9999,
+            db=db,
+        )
+
+    def test_start_recovers_unprocessed_posts(self, tmp_path: Path):
+        pipeline = self._make_pipeline(tmp_path)
+        # Pre-populate DB with unprocessed posts
+        p1 = _make_post(id="recover1")
+        p2 = _make_post(id="recover2")
+        pipeline._db.save_post(p1)
+        pipeline._db.save_post(p2)
+
+        # Start and immediately stop
+        def send_stop():
+            time.sleep(0.1)
+            pipeline._stop_event.set()
+
+        stop_thread = threading.Thread(target=send_stop)
+        stop_thread.start()
+        pipeline.start()
+        stop_thread.join(timeout=2)
+
+        # Buffer should have received the recovered posts
+        assert pipeline._buffer.add_post.call_count == 2
+
+    def test_recovery_does_not_record_health(self, tmp_path: Path):
+        """Recovered posts should not inflate the health counter."""
+        pipeline = self._make_pipeline(tmp_path)
+        pipeline._db.save_post(_make_post(id="r1"))
+
+        def send_stop():
+            time.sleep(0.1)
+            pipeline._stop_event.set()
+
+        stop_thread = threading.Thread(target=send_stop)
+        stop_thread.start()
+        pipeline.start()
+        stop_thread.join(timeout=2)
+
+        # Health should not have recorded these as new posts
+        status = pipeline.health.get_status()
+        assert status.posts_received == 0
+
+
+# ===========================================================================
+# build_pipeline with DB config
+# ===========================================================================
+
+
+class TestBuildPipelineDB:
+    """Tests for DB wiring in build_pipeline()."""
+
+    def test_db_path_from_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("MASTODON_INSTANCE_URL", "https://wien.rocks")
+        monkeypatch.setenv("MASTODON_CLIENT_ID", "test_client_id")
+        monkeypatch.setenv("MASTODON_CLIENT_SECRET", "test_client_secret")
+        monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "test_access_token")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+        monkeypatch.setenv(
+            "VIENNATALKSBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots")
+        )
+        db_path = str(tmp_path / "custom.db")
+        monkeypatch.setenv("VIENNATALKSBOUT_DB_PATH", db_path)
+
+        with patch("viennatalksbout.extractor.anthropic.Anthropic"):
+            pipeline = build_pipeline()
+
+        assert pipeline._db is not None
+        pipeline._db.close()
+
+    def test_empty_db_path_disables_persistence(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("MASTODON_INSTANCE_URL", "https://wien.rocks")
+        monkeypatch.setenv("MASTODON_CLIENT_ID", "test_client_id")
+        monkeypatch.setenv("MASTODON_CLIENT_SECRET", "test_client_secret")
+        monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "test_access_token")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+        monkeypatch.setenv(
+            "VIENNATALKSBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots")
+        )
+        monkeypatch.setenv("VIENNATALKSBOUT_DB_PATH", "")
+
+        with patch("viennatalksbout.extractor.anthropic.Anthropic"):
+            pipeline = build_pipeline()
+
+        assert pipeline._db is None
+
+    def test_load_pipeline_config_db_path_default(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.delenv("VIENNATALKSBOUT_DB_PATH", raising=False)
+        config = load_pipeline_config()
+        assert config["db_path"] == "data/viennatalksbout.db"
+
+    def test_load_pipeline_config_db_path_custom(
+        self, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("VIENNATALKSBOUT_DB_PATH", "/tmp/custom.db")
+        config = load_pipeline_config()
+        assert config["db_path"] == "/tmp/custom.db"
