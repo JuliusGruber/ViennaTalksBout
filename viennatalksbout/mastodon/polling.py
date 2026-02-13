@@ -121,6 +121,7 @@ class MastodonPollingDatasource(BaseDatasource):
             if not filter_status(validated):
                 continue
             post = parse_status(validated, self.source_id)
+            logger.info("Post received via polling: id=%s lang=%s source=%s", post.id, post.language, post.source)
             on_post(post)
 
         # Track the newest id for the next poll
