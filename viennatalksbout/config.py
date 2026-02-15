@@ -62,6 +62,57 @@ class ExtractorConfig:
         return errors
 
 
+@dataclass(frozen=True)
+class RedditConfig:
+    """Configuration for the Reddit datasource.
+
+    Attributes:
+        client_id: Reddit API OAuth client ID.
+        client_secret: Reddit API OAuth client secret.
+        username: Reddit account username.
+        password: Reddit account password.
+        subreddits: Tuple of subreddit names to poll.
+        poll_interval: Seconds between poll cycles.
+        user_agent: User-Agent string for Reddit API requests.
+        enabled: Whether the Reddit datasource is active.
+        include_comments: Whether to also poll comments (not just submissions).
+    """
+
+    client_id: str
+    client_secret: str
+    username: str
+    password: str
+    subreddits: tuple[str, ...] = ("wien", "austria")
+    poll_interval: int = 60
+    user_agent: str = ""
+    enabled: bool = False
+    include_comments: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.user_agent:
+            ua = f"ViennaTalksBout/1.0 (by /u/{self.username})"
+            object.__setattr__(self, "user_agent", ua)
+
+    def validate(self) -> list[str]:
+        """Return a list of validation error messages. Empty list means valid."""
+        errors: list[str] = []
+        if not self.enabled:
+            return errors
+        if not self.client_id:
+            errors.append("REDDIT_CLIENT_ID is required")
+        if not self.client_secret:
+            errors.append("REDDIT_CLIENT_SECRET is required")
+        if not self.username:
+            errors.append("REDDIT_USERNAME is required")
+        if not self.password:
+            errors.append("REDDIT_PASSWORD is required")
+        if not self.subreddits:
+            errors.append("REDDIT_SUBREDDITS must not be empty when Reddit is enabled")
+        if self.poll_interval <= 0:
+            errors.append("REDDIT_POLL_INTERVAL must be positive")
+        return errors
+
+
 DEFAULT_RSS_FEEDS = (
     ("https://rss.orf.at/wien.xml", "orf-wien"),
     ("https://rss.orf.at/news.xml", "orf-news"),
@@ -152,6 +203,54 @@ def load_rss_config() -> RssConfig:
     if errors:
         raise ValueError(
             "Invalid RSS configuration:\n" + "\n".join(f"  - {e}" for e in errors)
+        )
+
+    return config
+
+
+def load_reddit_config() -> RedditConfig:
+    """Load Reddit datasource configuration from environment variables.
+
+    Environment variables:
+        REDDIT_ENABLED: "true" to enable (default "false").
+        REDDIT_CLIENT_ID: OAuth client ID.
+        REDDIT_CLIENT_SECRET: OAuth client secret.
+        REDDIT_USERNAME: Reddit account username.
+        REDDIT_PASSWORD: Reddit account password.
+        REDDIT_SUBREDDITS: Comma-separated subreddit names (default "wien,austria").
+        REDDIT_POLL_INTERVAL: Seconds between polls (default 60).
+        REDDIT_INCLUDE_COMMENTS: "true" to also poll comments (default "true").
+
+    Returns:
+        A RedditConfig instance.
+
+    Raises:
+        ValueError: If the configuration is invalid when enabled.
+    """
+    enabled = os.environ.get("REDDIT_ENABLED", "false").strip().lower() == "true"
+
+    subreddits_raw = os.environ.get("REDDIT_SUBREDDITS", "wien,austria").strip()
+    subreddits = tuple(s.strip() for s in subreddits_raw.split(",") if s.strip())
+
+    include_comments = (
+        os.environ.get("REDDIT_INCLUDE_COMMENTS", "true").strip().lower() == "true"
+    )
+
+    config = RedditConfig(
+        client_id=os.environ.get("REDDIT_CLIENT_ID", "").strip(),
+        client_secret=os.environ.get("REDDIT_CLIENT_SECRET", "").strip(),
+        username=os.environ.get("REDDIT_USERNAME", "").strip(),
+        password=os.environ.get("REDDIT_PASSWORD", "").strip(),
+        subreddits=subreddits,
+        poll_interval=int(os.environ.get("REDDIT_POLL_INTERVAL", "60").strip()),
+        enabled=enabled,
+        include_comments=include_comments,
+    )
+
+    errors = config.validate()
+    if errors:
+        raise ValueError(
+            "Invalid Reddit configuration:\n" + "\n".join(f"  - {e}" for e in errors)
         )
 
     return config

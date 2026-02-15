@@ -17,13 +17,19 @@ from pathlib import Path
 from types import FrameType
 
 from viennatalksbout.buffer import PostBatch, PostBuffer
-from viennatalksbout.config import load_config, load_extractor_config, load_rss_config
+from viennatalksbout.config import (
+    load_config,
+    load_extractor_config,
+    load_reddit_config,
+    load_rss_config,
+)
 from viennatalksbout.datasource import BaseDatasource, Post
 from viennatalksbout.extractor import TopicExtractor
 from viennatalksbout.health import HealthMonitor
 from viennatalksbout.mastodon.polling import MastodonPollingDatasource
 from viennatalksbout.mastodon.stream import MastodonDatasource
 from viennatalksbout.news.rss import RssDatasource
+from viennatalksbout.reddit.datasource import RedditDatasource
 from viennatalksbout.persistence import PostDatabase
 from viennatalksbout.store import TopicStore
 
@@ -414,6 +420,15 @@ def build_pipeline() -> IngestionPipeline:
         )
         datasources.append(rss_ds)
         logger.info("RSS datasource enabled with %d feeds", len(rss_config.feeds))
+
+    # Optionally add Reddit datasource
+    reddit_config = load_reddit_config()
+    if reddit_config.enabled:
+        reddit_ds = RedditDatasource(config=reddit_config)
+        datasources.append(reddit_ds)
+        logger.info(
+            "Reddit datasource enabled for r/%s", "+".join(reddit_config.subreddits)
+        )
 
     extractor = TopicExtractor(
         api_key=extractor_config.api_key,
