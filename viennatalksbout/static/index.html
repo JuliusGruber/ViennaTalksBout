@@ -171,17 +171,6 @@
     return BLUE_PALETTE[Math.abs(hash) % BLUE_PALETTE.length];
   }
 
-  // Stable rotation per topic name: most horizontal, some rotated
-  var ROTATIONS = [0, 0, 0, 0, 0, 90, -90, 0, 0, 0];
-  function topicRotation(name) {
-    var hash = 0;
-    for (var i = 0; i < name.length; i++) {
-      hash = ((hash << 7) - hash) + name.charCodeAt(i);
-      hash |= 0;
-    }
-    return ROTATIONS[Math.abs(hash) % ROTATIONS.length];
-  }
-
   function scoreFontSize(score) {
     const minRem = 0.7;
     const maxRem = 4.0;
@@ -218,10 +207,6 @@
         el.textContent = t.name;
         el.style.fontSize = scoreFontSize(t.score) + 'rem';
         el.style.color = t.state === 'shrinking' ? '#90a4ae' : topicColor(name);
-        if (t.score < 0.6 && topicRotation(name) !== 0) {
-          el.style.writingMode = 'vertical-rl';
-          el.style.textOrientation = 'mixed';
-        }
         cloud.appendChild(el);
       }
       currentTopics.set(name, t);
