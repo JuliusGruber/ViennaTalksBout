@@ -8,8 +8,8 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: #0f0f1a;
-    color: #e0e0e0;
+    background: #ffffff;
+    color: #1a3a5c;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
@@ -25,14 +25,14 @@
 
   header h1 {
     font-size: 2rem;
-    font-weight: 300;
+    font-weight: 700;
     letter-spacing: 0.05em;
-    color: #ffffff;
+    color: #0d47a1;
   }
 
   header p {
     font-size: 0.85rem;
-    color: #888;
+    color: #5a7da0;
     margin-top: 0.3rem;
   }
 
@@ -42,7 +42,7 @@
     justify-content: center;
     align-items: center;
     align-content: center;
-    gap: 0.8rem 1.2rem;
+    gap: 0.15rem 0.3rem;
     max-width: 900px;
     padding: 1rem 1rem;
     min-height: 300px;
@@ -51,26 +51,24 @@
 
   .topic {
     display: inline-block;
-    padding: 0.3em 0.6em;
-    border-radius: 4px;
+    padding: 0;
     cursor: default;
     white-space: nowrap;
     transition: all 0.8s ease;
+    font-weight: 700;
+    line-height: 1.1;
   }
 
   .topic.entering {
     animation: fadeIn 0.8s ease forwards;
-    color: #8ecae6;
   }
 
   .topic.growing {
-    color: #ffffff;
-    text-shadow: 0 0 8px rgba(142, 202, 230, 0.4);
+    text-shadow: none;
   }
 
   .topic.shrinking {
-    color: #666;
-    opacity: 0.6;
+    opacity: 0.5;
   }
 
   .topic.removing {
@@ -98,12 +96,12 @@
 
   #time-slider {
     flex: 1;
-    accent-color: #8ecae6;
+    accent-color: #1565c0;
   }
 
   #slider-label {
     font-size: 0.8rem;
-    color: #888;
+    color: #5a7da0;
     min-width: 80px;
     text-align: center;
   }
@@ -112,7 +110,7 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #444;
+    background: #ccc;
     flex-shrink: 0;
   }
 
@@ -120,7 +118,7 @@
   #health-dot.stale { background: #e74c3c; }
 
   #empty-msg {
-    color: #555;
+    color: #90a4ae;
     font-style: italic;
     font-size: 1rem;
   }
@@ -156,9 +154,37 @@
   let pollTimer = null;
   const POLL_INTERVAL = 15000;
 
+  // Blue palette inspired by the social media tag cloud design
+  const BLUE_PALETTE = [
+    '#0d47a1', '#1565c0', '#1976d2', '#1e88e5',
+    '#2196f3', '#1a237e', '#283593', '#303f9f',
+    '#3949ab', '#0a3d91', '#0b5394', '#073763'
+  ];
+
+  // Stable color per topic name (hash-based)
+  function topicColor(name) {
+    var hash = 0;
+    for (var i = 0; i < name.length; i++) {
+      hash = ((hash << 5) - hash) + name.charCodeAt(i);
+      hash |= 0;
+    }
+    return BLUE_PALETTE[Math.abs(hash) % BLUE_PALETTE.length];
+  }
+
+  // Stable rotation per topic name: most horizontal, some rotated
+  var ROTATIONS = [0, 0, 0, 0, 0, 90, -90, 0, 0, 0];
+  function topicRotation(name) {
+    var hash = 0;
+    for (var i = 0; i < name.length; i++) {
+      hash = ((hash << 7) - hash) + name.charCodeAt(i);
+      hash |= 0;
+    }
+    return ROTATIONS[Math.abs(hash) % ROTATIONS.length];
+  }
+
   function scoreFontSize(score) {
-    const minRem = 0.9;
-    const maxRem = 3.5;
+    const minRem = 0.7;
+    const maxRem = 4.0;
     return minRem + (maxRem - minRem) * Math.max(0, Math.min(1, score));
   }
 
@@ -184,12 +210,18 @@
       if (el) {
         el.style.fontSize = scoreFontSize(t.score) + 'rem';
         el.className = 'topic ' + t.state;
+        el.style.color = t.state === 'shrinking' ? '#90a4ae' : topicColor(name);
       } else {
         el = document.createElement('span');
         el.id = 'topic-' + CSS.escape(name);
         el.className = 'topic ' + t.state;
         el.textContent = t.name;
         el.style.fontSize = scoreFontSize(t.score) + 'rem';
+        el.style.color = t.state === 'shrinking' ? '#90a4ae' : topicColor(name);
+        if (t.score < 0.6 && topicRotation(name) !== 0) {
+          el.style.writingMode = 'vertical-rl';
+          el.style.textOrientation = 'mixed';
+        }
         cloud.appendChild(el);
       }
       currentTopics.set(name, t);
