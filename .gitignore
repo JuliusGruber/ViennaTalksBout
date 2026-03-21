@@ -33,3 +33,8 @@ data/
 
 # Playwright MCP
 .playwright-mcp/
+
+# Gas Town runtime
+.beads/
+.claude/
+.runtime/
