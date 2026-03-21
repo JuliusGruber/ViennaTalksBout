@@ -246,7 +246,7 @@ class TestLoadMastodonConfigs:
         monkeypatch.setenv("MASTODON_2_CLIENT_ID", "id2")
         monkeypatch.setenv("MASTODON_2_CLIENT_SECRET", "secret2")
         monkeypatch.setenv("MASTODON_2_ACCESS_TOKEN", "token2")
-        monkeypatch.setenv("MASTODON_3_INSTANCE_URL", "https://third.example")
+        monkeypatch.setenv("MASTODON_3_INSTANCE_URL", "https://fedi.at")
         monkeypatch.setenv("MASTODON_3_CLIENT_ID", "id3")
         monkeypatch.setenv("MASTODON_3_CLIENT_SECRET", "secret3")
         monkeypatch.setenv("MASTODON_3_ACCESS_TOKEN", "token3")
