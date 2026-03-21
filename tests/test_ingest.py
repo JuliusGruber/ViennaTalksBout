@@ -699,6 +699,35 @@ class TestBuildPipeline:
         assert isinstance(pipeline._datasources[0], MastodonPollingDatasource)
         assert pipeline._datasources[0]._poll_interval == 15
 
+    def test_build_pipeline_two_mastodon_instances(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Two Mastodon instances should create two datasources."""
+        monkeypatch.setenv("MASTODON_INSTANCE_URL", "https://wien.rocks")
+        monkeypatch.setenv("MASTODON_CLIENT_ID", "primary_id")
+        monkeypatch.setenv("MASTODON_CLIENT_SECRET", "primary_secret")
+        monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "primary_token")
+        monkeypatch.setenv("MASTODON_2_INSTANCE_URL", "https://mastodon.wien")
+        monkeypatch.setenv("MASTODON_2_CLIENT_ID", "second_id")
+        monkeypatch.setenv("MASTODON_2_CLIENT_SECRET", "second_secret")
+        monkeypatch.setenv("MASTODON_2_ACCESS_TOKEN", "second_token")
+        monkeypatch.delenv("MASTODON_3_INSTANCE_URL", raising=False)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+        monkeypatch.setenv("VIENNATALKSBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots"))
+        monkeypatch.setenv("MASTODON_DATASOURCE_MODE", "stream")
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
+
+        with patch("viennatalksbout.extractor.anthropic.Anthropic"):
+            pipeline = build_pipeline()
+
+        mastodon_datasources = [
+            ds for ds in pipeline._datasources if isinstance(ds, MastodonDatasource)
+        ]
+        assert len(mastodon_datasources) == 2
+        source_ids = {ds.source_id for ds in mastodon_datasources}
+        assert "mastodon:wien.rocks" in source_ids
+        assert "mastodon:mastodon.wien" in source_ids
+
 
 # ===========================================================================
 # Persistence integration — _on_post with DB

@@ -14,6 +14,7 @@ from viennatalksbout.config import (
     MastodonConfig,
     load_config,
     load_extractor_config,
+    load_mastodon_configs,
 )
 
 
@@ -193,6 +194,67 @@ class TestLoadConfig:
         assert "MASTODON_CLIENT_ID is required" in error_msg
         assert "MASTODON_CLIENT_SECRET is required" in error_msg
         assert "MASTODON_ACCESS_TOKEN is required" in error_msg
+
+
+class TestLoadMastodonConfigs:
+    """Tests for load_mastodon_configs() — multi-instance support."""
+
+    def _set_primary(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("MASTODON_INSTANCE_URL", "https://wien.rocks")
+        monkeypatch.setenv("MASTODON_CLIENT_ID", "primary_id")
+        monkeypatch.setenv("MASTODON_CLIENT_SECRET", "primary_secret")
+        monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "primary_token")
+
+    def test_single_instance_returns_one_config(self, monkeypatch: pytest.MonkeyPatch):
+        self._set_primary(monkeypatch)
+        monkeypatch.delenv("MASTODON_2_INSTANCE_URL", raising=False)
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
+
+        configs = load_mastodon_configs()
+        assert len(configs) == 1
+        assert configs[0].instance_url == "https://wien.rocks"
+
+    def test_two_instances(self, monkeypatch: pytest.MonkeyPatch):
+        self._set_primary(monkeypatch)
+        monkeypatch.setenv("MASTODON_2_INSTANCE_URL", "https://mastodon.wien")
+        monkeypatch.setenv("MASTODON_2_CLIENT_ID", "second_id")
+        monkeypatch.setenv("MASTODON_2_CLIENT_SECRET", "second_secret")
+        monkeypatch.setenv("MASTODON_2_ACCESS_TOKEN", "second_token")
+        monkeypatch.delenv("MASTODON_3_INSTANCE_URL", raising=False)
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
+
+        configs = load_mastodon_configs()
+        assert len(configs) == 2
+        assert configs[0].instance_url == "https://wien.rocks"
+        assert configs[1].instance_url == "https://mastodon.wien"
+        assert configs[1].client_id == "second_id"
+
+    def test_invalid_second_instance_raises(self, monkeypatch: pytest.MonkeyPatch):
+        self._set_primary(monkeypatch)
+        monkeypatch.setenv("MASTODON_2_INSTANCE_URL", "https://mastodon.wien")
+        monkeypatch.setenv("MASTODON_2_CLIENT_ID", "")
+        monkeypatch.setenv("MASTODON_2_CLIENT_SECRET", "")
+        monkeypatch.setenv("MASTODON_2_ACCESS_TOKEN", "")
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
+
+        with pytest.raises(ValueError, match="Invalid Mastodon instance 2"):
+            load_mastodon_configs()
+
+    def test_three_instances(self, monkeypatch: pytest.MonkeyPatch):
+        self._set_primary(monkeypatch)
+        monkeypatch.setenv("MASTODON_2_INSTANCE_URL", "https://mastodon.wien")
+        monkeypatch.setenv("MASTODON_2_CLIENT_ID", "id2")
+        monkeypatch.setenv("MASTODON_2_CLIENT_SECRET", "secret2")
+        monkeypatch.setenv("MASTODON_2_ACCESS_TOKEN", "token2")
+        monkeypatch.setenv("MASTODON_3_INSTANCE_URL", "https://third.example")
+        monkeypatch.setenv("MASTODON_3_CLIENT_ID", "id3")
+        monkeypatch.setenv("MASTODON_3_CLIENT_SECRET", "secret3")
+        monkeypatch.setenv("MASTODON_3_ACCESS_TOKEN", "token3")
+        monkeypatch.delenv("MASTODON_4_INSTANCE_URL", raising=False)
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
+
+        configs = load_mastodon_configs()
+        assert len(configs) == 3
 
 
 # ===========================================================================

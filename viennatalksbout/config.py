@@ -290,6 +290,56 @@ def load_config(env_path: str | Path | None = None) -> MastodonConfig:
     return config
 
 
+def load_mastodon_configs(
+    env_path: str | Path | None = None,
+) -> list[MastodonConfig]:
+    """Load one or more Mastodon instance configurations.
+
+    The primary instance uses the standard ``MASTODON_*`` env vars.
+    Additional instances use numbered prefixes: ``MASTODON_2_*``,
+    ``MASTODON_3_*``, etc.
+
+    Args:
+        env_path: Optional path to a .env file.
+
+    Returns:
+        A list of validated MastodonConfig instances (at least one).
+
+    Raises:
+        ValueError: If the primary config is invalid, or if any numbered
+            instance has a partial configuration.
+    """
+    primary = load_config(env_path)
+    configs = [primary]
+
+    # Scan for numbered instances (MASTODON_2_*, MASTODON_3_*, …)
+    n = 2
+    while True:
+        prefix = f"MASTODON_{n}_"
+        instance_url = os.environ.get(f"{prefix}INSTANCE_URL", "").strip()
+        if not instance_url:
+            break
+
+        config = MastodonConfig(
+            instance_url=instance_url,
+            client_id=os.environ.get(f"{prefix}CLIENT_ID", "").strip(),
+            client_secret=os.environ.get(f"{prefix}CLIENT_SECRET", "").strip(),
+            access_token=os.environ.get(f"{prefix}ACCESS_TOKEN", "").strip(),
+        )
+
+        errors = config.validate()
+        if errors:
+            raise ValueError(
+                f"Invalid Mastodon instance {n} configuration:\n"
+                + "\n".join(f"  - {e}" for e in errors)
+            )
+
+        configs.append(config)
+        n += 1
+
+    return configs
+
+
 def load_extractor_config(env_path: str | Path | None = None) -> ExtractorConfig:
     """Load topic extractor configuration from environment variables.
 

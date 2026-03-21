@@ -18,8 +18,8 @@ from types import FrameType
 
 from viennatalksbout.buffer import PostBatch, PostBuffer
 from viennatalksbout.config import (
-    load_config,
     load_extractor_config,
+    load_mastodon_configs,
     load_reddit_config,
     load_rss_config,
 )
@@ -372,14 +372,15 @@ def build_pipeline() -> IngestionPipeline:
     Raises:
         ValueError: If required configuration is missing or invalid.
     """
-    mastodon_config = load_config()
+    mastodon_configs = load_mastodon_configs()
     extractor_config = load_extractor_config()
     pipeline_config = load_pipeline_config()
 
+    instance_names = ", ".join(c.instance_url for c in mastodon_configs)
     logger.info(
-        "Configuration loaded: instance=%s, model=%s, "
+        "Configuration loaded: instances=%s, model=%s, "
         "buffer_window=%ds, snapshot_dir=%s",
-        mastodon_config.instance_url,
+        instance_names,
         extractor_config.model,
         pipeline_config["buffer_window_seconds"],
         pipeline_config["snapshot_dir"],
@@ -388,27 +389,27 @@ def build_pipeline() -> IngestionPipeline:
     db_path = pipeline_config["db_path"]
     db = PostDatabase(db_path) if db_path else None
 
-    # Build datasource list
+    # Build datasource list — one datasource per Mastodon instance
     datasources: list[BaseDatasource] = []
 
     datasource_mode = pipeline_config["datasource_mode"]
-    if datasource_mode == "polling":
-        # Recover since_id from database so restarts skip already-seen posts
-        initial_since_id = db.get_max_post_id() if db is not None else None
-        if initial_since_id:
-            logger.info("Resuming polling from since_id=%s", initial_since_id)
-        mastodon_ds: BaseDatasource = MastodonPollingDatasource(
-            instance_url=mastodon_config.instance_url,
-            access_token=mastodon_config.access_token,
-            poll_interval=pipeline_config["poll_interval_seconds"],
-            initial_since_id=initial_since_id,
-        )
-    else:
-        mastodon_ds = MastodonDatasource(
-            instance_url=mastodon_config.instance_url,
-            access_token=mastodon_config.access_token,
-        )
-    datasources.append(mastodon_ds)
+    for mastodon_config in mastodon_configs:
+        if datasource_mode == "polling":
+            initial_since_id = db.get_max_post_id() if db is not None else None
+            if initial_since_id:
+                logger.info("Resuming polling from since_id=%s", initial_since_id)
+            mastodon_ds: BaseDatasource = MastodonPollingDatasource(
+                instance_url=mastodon_config.instance_url,
+                access_token=mastodon_config.access_token,
+                poll_interval=pipeline_config["poll_interval_seconds"],
+                initial_since_id=initial_since_id,
+            )
+        else:
+            mastodon_ds = MastodonDatasource(
+                instance_url=mastodon_config.instance_url,
+                access_token=mastodon_config.access_token,
+            )
+        datasources.append(mastodon_ds)
 
     # Optionally add RSS datasource
     rss_config = load_rss_config()
