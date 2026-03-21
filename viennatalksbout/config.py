@@ -158,6 +158,86 @@ class RssConfig:
         return errors
 
 
+@dataclass(frozen=True)
+class LemmyConfig:
+    """Configuration for the Lemmy datasource.
+
+    Attributes:
+        instance: Lemmy instance hostname (e.g. "feddit.org").
+        communities: Tuple of community names to poll.
+        poll_interval: Seconds between poll cycles.
+        user_agent: User-Agent header for HTTP requests.
+        enabled: Whether the Lemmy datasource is active.
+    """
+
+    instance: str = "feddit.org"
+    communities: tuple[str, ...] = ("austria", "dach")
+    poll_interval: int = 300
+    user_agent: str = "ViennaTalksBout/1.0"
+    enabled: bool = False
+
+    def validate(self) -> list[str]:
+        """Return a list of validation error messages. Empty list means valid."""
+        errors: list[str] = []
+        if not self.enabled:
+            return errors
+        if not self.instance:
+            errors.append("LEMMY_INSTANCE is required")
+        if not self.communities:
+            errors.append(
+                "LEMMY_COMMUNITIES must not be empty when Lemmy is enabled"
+            )
+        if self.poll_interval <= 0:
+            errors.append("LEMMY_POLL_INTERVAL must be positive")
+        return errors
+
+
+def load_lemmy_config() -> LemmyConfig:
+    """Load Lemmy datasource configuration from environment variables.
+
+    Environment variables:
+        LEMMY_ENABLED: "true" to enable (default "false").
+        LEMMY_INSTANCE: Instance hostname (default "feddit.org").
+        LEMMY_COMMUNITIES: Comma-separated community names (default "austria,dach").
+        LEMMY_POLL_INTERVAL: Seconds between polls (default 300).
+        LEMMY_USER_AGENT: User-Agent header (default "ViennaTalksBout/1.0").
+
+    Returns:
+        A LemmyConfig instance.
+
+    Raises:
+        ValueError: If the configuration is invalid when enabled.
+    """
+    enabled = os.environ.get("LEMMY_ENABLED", "false").strip().lower() == "true"
+
+    instance = os.environ.get("LEMMY_INSTANCE", "feddit.org").strip()
+
+    communities_raw = os.environ.get("LEMMY_COMMUNITIES", "austria,dach").strip()
+    communities = tuple(
+        c.strip() for c in communities_raw.split(",") if c.strip()
+    )
+
+    poll_interval = int(os.environ.get("LEMMY_POLL_INTERVAL", "300").strip())
+    user_agent = os.environ.get("LEMMY_USER_AGENT", "ViennaTalksBout/1.0").strip()
+
+    config = LemmyConfig(
+        instance=instance,
+        communities=communities,
+        poll_interval=poll_interval,
+        user_agent=user_agent,
+        enabled=enabled,
+    )
+
+    errors = config.validate()
+    if errors:
+        raise ValueError(
+            "Invalid Lemmy configuration:\n"
+            + "\n".join(f"  - {e}" for e in errors)
+        )
+
+    return config
+
+
 def load_rss_config() -> RssConfig:
     """Load RSS datasource configuration from environment variables.
 

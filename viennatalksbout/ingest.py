@@ -19,6 +19,7 @@ from types import FrameType
 from viennatalksbout.buffer import PostBatch, PostBuffer
 from viennatalksbout.config import (
     load_extractor_config,
+    load_lemmy_config,
     load_mastodon_configs,
     load_reddit_config,
     load_rss_config,
@@ -28,6 +29,7 @@ from viennatalksbout.extractor import TopicExtractor
 from viennatalksbout.health import HealthMonitor
 from viennatalksbout.mastodon.polling import MastodonPollingDatasource
 from viennatalksbout.mastodon.stream import MastodonDatasource
+from viennatalksbout.lemmy.datasource import LemmyDatasource
 from viennatalksbout.news.rss import RssDatasource
 from viennatalksbout.reddit.datasource import RedditDatasource
 from viennatalksbout.persistence import PostDatabase
@@ -421,6 +423,17 @@ def build_pipeline() -> IngestionPipeline:
         )
         datasources.append(rss_ds)
         logger.info("RSS datasource enabled with %d feeds", len(rss_config.feeds))
+
+    # Optionally add Lemmy datasource
+    lemmy_config = load_lemmy_config()
+    if lemmy_config.enabled:
+        lemmy_ds = LemmyDatasource(config=lemmy_config)
+        datasources.append(lemmy_ds)
+        logger.info(
+            "Lemmy datasource enabled for %s communities: %s",
+            lemmy_config.instance,
+            ", ".join(lemmy_config.communities),
+        )
 
     # Optionally add Reddit datasource
     reddit_config = load_reddit_config()
