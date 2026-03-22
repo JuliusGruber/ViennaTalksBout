@@ -94,6 +94,42 @@ Criteria: Vienna structural locality, API availability, volume, legal viability.
 - **Why defer**: Chat-like content, often off-topic chatter rather than Vienna news/events
 - **API**: Matrix Client-Server API, can search room directory
 
+## Easy RSS Wins (Agent 2 findings)
+
+These Vienna-focused RSS feeds can be added to the existing RSS datasource with zero new code:
+
+### Falter.at (Vienna culture/events weekly)
+- **Feed**: `https://www.falter.at/rss`
+- **Vienna specificity**: Very high — THE Vienna culture/events publication
+- **Volume**: Daily editorial updates (politics, culture, film, food)
+- **Effort**: Easy — add to RSS_FEEDS config
+- **Note**: Event database has no RSS/API, would need scraping for event trends
+
+### 1000things Magazine
+- **Feed**: `https://www.1000thingsmagazine.com/feed/`
+- **Vienna specificity**: High — Vienna and Austria lifestyle
+- **Volume**: Updates multiple times daily (event previews, cafe recs, seasonal activities)
+- **Effort**: Easy — add to RSS_FEEDS config
+
+### stadtbekannt.at
+- **Feed**: `https://www.stadtbekannt.at/feed/`
+- **Vienna specificity**: 100% Vienna city magazine
+- **Volume**: Moderate (updates every few days)
+- **Effort**: Easy — add to RSS_FEEDS config
+
+### derstandard.at (headlines only)
+- **Feed**: `https://www.derstandard.at/rss`
+- **Vienna specificity**: Medium — national news with significant Vienna coverage
+- **Volume**: High — continuous updates throughout the day
+- **Effort**: Easy — add to RSS_FEEDS config
+- **Note**: Comment section (30K/day) would be high-value but requires scraping
+
+### Mastodon hashtag timelines (#wien, #vienna)
+- **Feed**: `mastodon.social/api/v1/timelines/tag/wien` (no auth needed)
+- **Vienna specificity**: High — hashtag filtered
+- **Volume**: Low-moderate, niche audience
+- **Effort**: Easy — could add as additional Mastodon polling source
+
 ## Not Viable
 
 | Source | Reason |
@@ -106,11 +142,19 @@ Criteria: Vienna structural locality, API availability, volume, legal viability.
 
 ## Implementation Priority
 
-1. **Activate mastodon.wien + fedi.at** (config only)
-2. **Enable Reddit** (needs user to create app at reddit.com/prefs/apps)
-3. **Extend Lemmy to multi-instance** (small refactor)
-4. **Wien.gv.at petitions** (easy, 100% Vienna civic signal)
-5. **Bluesky keyword search** (medium, growing platform)
-6. **derstandard.at comments** (high value but scraping complexity)
-7. **Threads** (medium, Meta bureaucracy)
-8. **X/Twitter trending** (good fit but $100+/mo)
+### Tier 1 — Config changes only, no new code
+1. **Add RSS feeds**: falter.at, 1000things, stadtbekannt.at, derstandard.at (just add to RSS_FEEDS env var)
+2. **Activate mastodon.wien + fedi.at** (register apps, add creds)
+
+### Tier 2 — Needs credentials from user
+3. **Enable Reddit** (user creates app at reddit.com/prefs/apps)
+
+### Tier 3 — Small refactors
+4. **Extend Lemmy to multi-instance** (add feddit.de, lemmy.world, feddit.org/c/wien)
+5. **Wien.gv.at petitions** (easy HTML scraping, 100% Vienna civic signal)
+
+### Tier 4 — New datasource modules
+6. **Bluesky keyword search** (medium, growing platform)
+7. **Threads** (medium, Meta app review bureaucracy)
+8. **derstandard.at comments** (high value but scraping complexity)
+9. **X/Twitter trending** (good fit but $100+/mo)
