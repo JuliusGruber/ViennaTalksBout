@@ -143,7 +143,7 @@ class TestCLIExtractHappyPath:
         call_args = mock_run.call_args
         cmd = call_args[0][0]
         assert cmd[0] == "claude"
-        assert "--print" in cmd
+        assert "-p" in cmd
         assert "--output-format" in cmd
         assert "json" in cmd
         assert "--model" in cmd
