@@ -572,16 +572,27 @@ class TestBlueskyIntegration:
 
     @pytest.mark.integration
     def test_search_returns_posts(self):
-        """Verify the public search API returns results for 'wien'."""
+        """Verify the public search API returns results for 'wien'.
+
+        Skips gracefully on network errors or API access restrictions (e.g. 403).
+        """
         import requests
 
         url = "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts"
-        resp = requests.get(
-            url,
-            params={"q": "wien", "limit": 5, "lang": "de"},
-            headers={"User-Agent": "ViennaTalksBout/1.0 (integration-test)"},
-            timeout=30,
-        )
+        try:
+            resp = requests.get(
+                url,
+                params={"q": "wien", "limit": 5, "lang": "de"},
+                headers={"User-Agent": "ViennaTalksBout/1.0 (integration-test)"},
+                timeout=30,
+            )
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            pytest.skip(f"Bluesky API unreachable: {exc}")
+
+        if resp.status_code in (403, 429, 502, 503):
+            pytest.skip(
+                f"Bluesky API returned {resp.status_code}, skipping integration test"
+            )
         resp.raise_for_status()
         data = resp.json()
 
