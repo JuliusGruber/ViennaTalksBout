@@ -265,6 +265,42 @@ class WienGvConfig:
         return errors
 
 
+@dataclass(frozen=True)
+class BlueskyConfig:
+    """Configuration for the Bluesky datasource.
+
+    Attributes:
+        search_queries: Tuple of search query strings (e.g. "wien", "vienna").
+        lang: Language filter for search results (e.g. "de"). Empty means no filter.
+        poll_interval: Seconds between poll cycles.
+        limit: Max posts per search query per poll (1-100).
+        user_agent: User-Agent header for HTTP requests.
+        enabled: Whether the Bluesky datasource is active.
+    """
+
+    search_queries: tuple[str, ...] = ("wien", "vienna")
+    lang: str = "de"
+    poll_interval: int = 120
+    limit: int = 25
+    user_agent: str = "ViennaTalksBout/1.0"
+    enabled: bool = False
+
+    def validate(self) -> list[str]:
+        """Return a list of validation error messages. Empty list means valid."""
+        errors: list[str] = []
+        if not self.enabled:
+            return errors
+        if not self.search_queries:
+            errors.append(
+                "BLUESKY_SEARCH_QUERIES must not be empty when Bluesky is enabled"
+            )
+        if self.poll_interval <= 0:
+            errors.append("BLUESKY_POLL_INTERVAL must be positive")
+        if not 1 <= self.limit <= 100:
+            errors.append("BLUESKY_LIMIT must be between 1 and 100")
+        return errors
+
+
 def load_threads_config() -> ThreadsConfig:
     """Load Threads datasource configuration from environment variables.
 
@@ -339,6 +375,54 @@ def load_wien_gv_config() -> WienGvConfig:
     if errors:
         raise ValueError(
             "Invalid Wien.gv configuration:\n"
+            + "\n".join(f"  - {e}" for e in errors)
+        )
+
+    return config
+
+
+def load_bluesky_config() -> BlueskyConfig:
+    """Load Bluesky datasource configuration from environment variables.
+
+    Environment variables:
+        BLUESKY_ENABLED: "true" to enable (default "false").
+        BLUESKY_SEARCH_QUERIES: Comma-separated search terms (default "wien,vienna").
+        BLUESKY_LANG: Language filter (default "de"). Set to "" for no filter.
+        BLUESKY_POLL_INTERVAL: Seconds between polls (default 120).
+        BLUESKY_LIMIT: Max results per query per poll (default 25, max 100).
+        BLUESKY_USER_AGENT: User-Agent header (default "ViennaTalksBout/1.0").
+
+    Returns:
+        A BlueskyConfig instance.
+
+    Raises:
+        ValueError: If the configuration is invalid when enabled.
+    """
+    enabled = os.environ.get("BLUESKY_ENABLED", "false").strip().lower() == "true"
+
+    queries_raw = os.environ.get("BLUESKY_SEARCH_QUERIES", "wien,vienna").strip()
+    search_queries = tuple(
+        q.strip() for q in queries_raw.split(",") if q.strip()
+    )
+
+    lang = os.environ.get("BLUESKY_LANG", "de").strip()
+    poll_interval = int(os.environ.get("BLUESKY_POLL_INTERVAL", "120").strip())
+    limit = int(os.environ.get("BLUESKY_LIMIT", "25").strip())
+    user_agent = os.environ.get("BLUESKY_USER_AGENT", "ViennaTalksBout/1.0").strip()
+
+    config = BlueskyConfig(
+        search_queries=search_queries,
+        lang=lang,
+        poll_interval=poll_interval,
+        limit=limit,
+        user_agent=user_agent,
+        enabled=enabled,
+    )
+
+    errors = config.validate()
+    if errors:
+        raise ValueError(
+            "Invalid Bluesky configuration:\n"
             + "\n".join(f"  - {e}" for e in errors)
         )
 
