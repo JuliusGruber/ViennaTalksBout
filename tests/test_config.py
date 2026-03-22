@@ -11,9 +11,11 @@ import pytest
 from viennatalksbout.config import (
     DEFAULT_EXTRACTOR_MODEL,
     ExtractorConfig,
+    LemmyConfig,
     MastodonConfig,
     load_config,
     load_extractor_config,
+    load_lemmy_configs,
     load_mastodon_configs,
 )
 
@@ -389,3 +391,140 @@ class TestLoadExtractorConfig:
         with pytest.raises(ValueError) as exc_info:
             load_extractor_config(env_file)
         assert "ANTHROPIC_API_KEY is required" in str(exc_info.value)
+
+
+# ===========================================================================
+# load_lemmy_configs — multi-instance Lemmy support
+# ===========================================================================
+
+
+class TestLoadLemmyConfigs:
+    """Tests for load_lemmy_configs() — multi-instance support."""
+
+    def _clear_lemmy_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Remove all LEMMY_* env vars to start clean."""
+        for key in list(os.environ):
+            if key.startswith("LEMMY"):
+                monkeypatch.delenv(key, raising=False)
+
+    def _set_primary(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("LEMMY_ENABLED", "true")
+        monkeypatch.setenv("LEMMY_INSTANCE", "feddit.org")
+        monkeypatch.setenv("LEMMY_COMMUNITIES", "austria,dach")
+
+    def test_disabled_returns_empty_list(self, monkeypatch: pytest.MonkeyPatch):
+        """LEMMY_ENABLED=false and no numbered instances → empty list."""
+        self._clear_lemmy_env(monkeypatch)
+        monkeypatch.setenv("LEMMY_ENABLED", "false")
+
+        configs = load_lemmy_configs()
+        assert configs == []
+
+    def test_not_set_returns_empty_list(self, monkeypatch: pytest.MonkeyPatch):
+        """No LEMMY_ENABLED at all → empty list."""
+        self._clear_lemmy_env(monkeypatch)
+
+        configs = load_lemmy_configs()
+        assert configs == []
+
+    def test_single_instance_returns_one_config(self, monkeypatch: pytest.MonkeyPatch):
+        self._clear_lemmy_env(monkeypatch)
+        self._set_primary(monkeypatch)
+
+        configs = load_lemmy_configs()
+        assert len(configs) == 1
+        assert configs[0].instance == "feddit.org"
+        assert configs[0].communities == ("austria", "dach")
+
+    def test_two_instances(self, monkeypatch: pytest.MonkeyPatch):
+        self._clear_lemmy_env(monkeypatch)
+        self._set_primary(monkeypatch)
+        monkeypatch.setenv("LEMMY_2_INSTANCE", "feddit.de")
+        monkeypatch.setenv("LEMMY_2_COMMUNITIES", "austria")
+
+        configs = load_lemmy_configs()
+        assert len(configs) == 2
+        assert configs[0].instance == "feddit.org"
+        assert configs[1].instance == "feddit.de"
+        assert configs[1].communities == ("austria",)
+
+    def test_three_instances(self, monkeypatch: pytest.MonkeyPatch):
+        self._clear_lemmy_env(monkeypatch)
+        self._set_primary(monkeypatch)
+        monkeypatch.setenv("LEMMY_2_INSTANCE", "feddit.de")
+        monkeypatch.setenv("LEMMY_2_COMMUNITIES", "austria")
+        monkeypatch.setenv("LEMMY_3_INSTANCE", "lemmy.world")
+        monkeypatch.setenv("LEMMY_3_COMMUNITIES", "vienna")
+
+        configs = load_lemmy_configs()
+        assert len(configs) == 3
+        assert configs[2].instance == "lemmy.world"
+        assert configs[2].communities == ("vienna",)
+
+    def test_numbered_instance_inherits_defaults(self, monkeypatch: pytest.MonkeyPatch):
+        """Numbered instances get default poll_interval and user_agent."""
+        self._clear_lemmy_env(monkeypatch)
+        self._set_primary(monkeypatch)
+        monkeypatch.setenv("LEMMY_2_INSTANCE", "feddit.de")
+        monkeypatch.setenv("LEMMY_2_COMMUNITIES", "austria")
+
+        configs = load_lemmy_configs()
+        assert configs[1].poll_interval == 300
+        assert configs[1].user_agent == "ViennaTalksBout/1.0"
+
+    def test_numbered_instance_custom_poll_interval(self, monkeypatch: pytest.MonkeyPatch):
+        self._clear_lemmy_env(monkeypatch)
+        self._set_primary(monkeypatch)
+        monkeypatch.setenv("LEMMY_2_INSTANCE", "feddit.de")
+        monkeypatch.setenv("LEMMY_2_COMMUNITIES", "austria")
+        monkeypatch.setenv("LEMMY_2_POLL_INTERVAL", "600")
+
+        configs = load_lemmy_configs()
+        assert configs[1].poll_interval == 600
+
+    def test_numbered_instance_disabled_is_skipped(self, monkeypatch: pytest.MonkeyPatch):
+        """LEMMY_2_ENABLED=false → instance is configured but not returned."""
+        self._clear_lemmy_env(monkeypatch)
+        self._set_primary(monkeypatch)
+        monkeypatch.setenv("LEMMY_2_INSTANCE", "feddit.de")
+        monkeypatch.setenv("LEMMY_2_COMMUNITIES", "austria")
+        monkeypatch.setenv("LEMMY_2_ENABLED", "false")
+        monkeypatch.setenv("LEMMY_3_INSTANCE", "lemmy.world")
+        monkeypatch.setenv("LEMMY_3_COMMUNITIES", "vienna")
+
+        configs = load_lemmy_configs()
+        assert len(configs) == 2
+        assert configs[0].instance == "feddit.org"
+        assert configs[1].instance == "lemmy.world"
+
+    def test_invalid_numbered_instance_raises(self, monkeypatch: pytest.MonkeyPatch):
+        """Numbered instance with empty communities → ValueError."""
+        self._clear_lemmy_env(monkeypatch)
+        self._set_primary(monkeypatch)
+        monkeypatch.setenv("LEMMY_2_INSTANCE", "feddit.de")
+        monkeypatch.setenv("LEMMY_2_COMMUNITIES", "")  # empty → invalid
+
+        with pytest.raises(ValueError, match="Invalid Lemmy instance 2"):
+            load_lemmy_configs()
+
+    def test_only_numbered_instances_no_primary(self, monkeypatch: pytest.MonkeyPatch):
+        """Primary disabled but numbered instances configured → returns numbered only."""
+        self._clear_lemmy_env(monkeypatch)
+        monkeypatch.setenv("LEMMY_ENABLED", "false")
+        monkeypatch.setenv("LEMMY_2_INSTANCE", "feddit.de")
+        monkeypatch.setenv("LEMMY_2_COMMUNITIES", "austria")
+
+        configs = load_lemmy_configs()
+        assert len(configs) == 1
+        assert configs[0].instance == "feddit.de"
+
+    def test_gap_in_numbering_stops_scan(self, monkeypatch: pytest.MonkeyPatch):
+        """LEMMY_2 missing, LEMMY_3 set → only primary returned (scan stops at gap)."""
+        self._clear_lemmy_env(monkeypatch)
+        self._set_primary(monkeypatch)
+        # No LEMMY_2_*, skip to LEMMY_3_*
+        monkeypatch.setenv("LEMMY_3_INSTANCE", "lemmy.world")
+        monkeypatch.setenv("LEMMY_3_COMMUNITIES", "vienna")
+
+        configs = load_lemmy_configs()
+        assert len(configs) == 1  # Only primary; LEMMY_3 unreachable
