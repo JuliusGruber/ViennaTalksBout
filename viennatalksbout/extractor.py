@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import time
 from dataclasses import dataclass
@@ -480,9 +481,13 @@ class CLITopicExtractor:
             RuntimeError: If the CLI exits with a non-zero status.
             json.JSONDecodeError: (raised by caller) if output isn't valid JSON.
         """
-        cmd = ["claude", "--print", "--output-format", "json"]
+        cmd = ["claude", "-p", "--output-format", "json"]
         if self._model:
             cmd.extend(["--model", self._model])
+
+        # Strip ANTHROPIC_API_KEY from the subprocess environment so the
+        # CLI falls back to OAuth/subscription auth instead of API credits.
+        env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
 
         result = subprocess.run(
             cmd,
@@ -490,6 +495,7 @@ class CLITopicExtractor:
             capture_output=True,
             text=True,
             timeout=120,
+            env=env,
         )
 
         if result.returncode != 0:
