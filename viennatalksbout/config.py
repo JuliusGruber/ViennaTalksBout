@@ -249,6 +249,101 @@ def load_lemmy_config() -> LemmyConfig:
     return config
 
 
+def _load_lemmy_instance(prefix: str) -> LemmyConfig | None:
+    """Load a single Lemmy instance config from env vars with the given prefix.
+
+    Args:
+        prefix: Environment variable prefix, e.g. ``"LEMMY_"`` or ``"LEMMY_2_"``.
+
+    Returns:
+        A LemmyConfig if the instance is configured, or None if not.
+    """
+    instance = os.environ.get(f"{prefix}INSTANCE", "").strip()
+    if not instance:
+        return None
+
+    enabled_raw = os.environ.get(f"{prefix}ENABLED", "true").strip().lower()
+    enabled = enabled_raw == "true"
+
+    communities_raw = os.environ.get(f"{prefix}COMMUNITIES", "").strip()
+    communities = tuple(
+        c.strip() for c in communities_raw.split(",") if c.strip()
+    ) if communities_raw else ()
+
+    poll_interval = int(os.environ.get(f"{prefix}POLL_INTERVAL", "300").strip())
+    user_agent = os.environ.get(
+        f"{prefix}USER_AGENT", "ViennaTalksBout/1.0"
+    ).strip()
+
+    return LemmyConfig(
+        instance=instance,
+        communities=communities,
+        poll_interval=poll_interval,
+        user_agent=user_agent,
+        enabled=enabled,
+    )
+
+
+def load_lemmy_configs() -> list[LemmyConfig]:
+    """Load one or more Lemmy instance configurations.
+
+    The primary instance uses the standard ``LEMMY_*`` env vars.
+    Additional instances use numbered prefixes: ``LEMMY_2_*``,
+    ``LEMMY_3_*``, etc.
+
+    If no ``LEMMY_ENABLED`` is set to ``"true"`` (or no ``LEMMY_INSTANCE``
+    is set), returns an empty list. Each numbered instance defaults to
+    enabled unless its own ``LEMMY_N_ENABLED`` is ``"false"``.
+
+    Environment variables (primary):
+        LEMMY_ENABLED: "true" to enable (default "false").
+        LEMMY_INSTANCE: Instance hostname (default "feddit.org").
+        LEMMY_COMMUNITIES: Comma-separated community names (default "austria,dach").
+        LEMMY_POLL_INTERVAL: Seconds between polls (default 300).
+        LEMMY_USER_AGENT: User-Agent header (default "ViennaTalksBout/1.0").
+
+    Additional instances (numbered):
+        LEMMY_2_INSTANCE, LEMMY_2_COMMUNITIES, LEMMY_2_POLL_INTERVAL, etc.
+        LEMMY_3_INSTANCE, LEMMY_3_COMMUNITIES, ...
+
+    Returns:
+        A list of validated, enabled LemmyConfig instances (may be empty).
+
+    Raises:
+        ValueError: If any configured instance has invalid settings.
+    """
+    configs: list[LemmyConfig] = []
+
+    # Primary instance — use load_lemmy_config() for backwards compatibility
+    primary_enabled = (
+        os.environ.get("LEMMY_ENABLED", "false").strip().lower() == "true"
+    )
+    if primary_enabled:
+        primary = load_lemmy_config()  # validates and raises on error
+        configs.append(primary)
+
+    # Scan for numbered instances (LEMMY_2_*, LEMMY_3_*, …)
+    n = 2
+    while True:
+        prefix = f"LEMMY_{n}_"
+        config = _load_lemmy_instance(prefix)
+        if config is None:
+            break
+
+        errors = config.validate()
+        if errors:
+            raise ValueError(
+                f"Invalid Lemmy instance {n} configuration:\n"
+                + "\n".join(f"  - {e}" for e in errors)
+            )
+
+        if config.enabled:
+            configs.append(config)
+        n += 1
+
+    return configs
+
+
 def load_rss_config() -> RssConfig:
     """Load RSS datasource configuration from environment variables.
 

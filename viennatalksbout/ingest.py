@@ -19,7 +19,7 @@ from types import FrameType
 from viennatalksbout.buffer import PostBatch, PostBuffer
 from viennatalksbout.config import (
     load_extractor_config,
-    load_lemmy_config,
+    load_lemmy_configs,
     load_mastodon_configs,
     load_reddit_config,
     load_rss_config,
@@ -433,9 +433,9 @@ def build_pipeline() -> IngestionPipeline:
         datasources.append(rss_ds)
         logger.info("RSS datasource enabled with %d feeds", len(rss_config.feeds))
 
-    # Optionally add Lemmy datasource
-    lemmy_config = load_lemmy_config()
-    if lemmy_config.enabled:
+    # Optionally add Lemmy datasource(s) — supports multiple instances
+    lemmy_configs = load_lemmy_configs()
+    for lemmy_config in lemmy_configs:
         lemmy_ds = LemmyDatasource(config=lemmy_config)
         datasources.append(lemmy_ds)
         logger.info(
