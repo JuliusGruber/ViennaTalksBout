@@ -237,6 +237,34 @@ class ThreadsConfig:
         return errors
 
 
+@dataclass(frozen=True)
+class WienGvConfig:
+    """Configuration for the Wien.gv.at petitions datasource.
+
+    Attributes:
+        url: Base URL for the petition platform.
+        poll_interval: Seconds between poll cycles.
+        user_agent: User-Agent header for HTTP requests.
+        enabled: Whether the Wien.gv datasource is active.
+    """
+
+    url: str = "https://petitionen.wien.gv.at"
+    poll_interval: int = 3600
+    user_agent: str = "ViennaTalksBout/1.0"
+    enabled: bool = False
+
+    def validate(self) -> list[str]:
+        """Return a list of validation error messages. Empty list means valid."""
+        errors: list[str] = []
+        if not self.enabled:
+            return errors
+        if not self.url:
+            errors.append("WIEN_GV_URL is required")
+        if self.poll_interval <= 0:
+            errors.append("WIEN_GV_POLL_INTERVAL must be positive")
+        return errors
+
+
 def load_threads_config() -> ThreadsConfig:
     """Load Threads datasource configuration from environment variables.
 
@@ -273,6 +301,44 @@ def load_threads_config() -> ThreadsConfig:
     if errors:
         raise ValueError(
             "Invalid Threads configuration:\n"
+            + "\n".join(f"  - {e}" for e in errors)
+        )
+
+    return config
+
+
+def load_wien_gv_config() -> WienGvConfig:
+    """Load Wien.gv.at petitions datasource configuration from environment variables.
+
+    Environment variables:
+        WIEN_GV_ENABLED: "true" to enable (default "false").
+        WIEN_GV_URL: Petition platform URL (default "https://petitionen.wien.gv.at").
+        WIEN_GV_POLL_INTERVAL: Seconds between polls (default 3600).
+        WIEN_GV_USER_AGENT: User-Agent header (default "ViennaTalksBout/1.0").
+
+    Returns:
+        A WienGvConfig instance.
+
+    Raises:
+        ValueError: If the configuration is invalid when enabled.
+    """
+    enabled = os.environ.get("WIEN_GV_ENABLED", "false").strip().lower() == "true"
+
+    config = WienGvConfig(
+        url=os.environ.get(
+            "WIEN_GV_URL", "https://petitionen.wien.gv.at"
+        ).strip(),
+        poll_interval=int(os.environ.get("WIEN_GV_POLL_INTERVAL", "3600").strip()),
+        user_agent=os.environ.get(
+            "WIEN_GV_USER_AGENT", "ViennaTalksBout/1.0"
+        ).strip(),
+        enabled=enabled,
+    )
+
+    errors = config.validate()
+    if errors:
+        raise ValueError(
+            "Invalid Wien.gv configuration:\n"
             + "\n".join(f"  - {e}" for e in errors)
         )
 

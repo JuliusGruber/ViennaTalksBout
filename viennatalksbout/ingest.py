@@ -24,6 +24,7 @@ from viennatalksbout.config import (
     load_reddit_config,
     load_rss_config,
     load_threads_config,
+    load_wien_gv_config,
 )
 from viennatalksbout.datasource import BaseDatasource, Post
 from viennatalksbout.extractor import CLITopicExtractor, TopicExtractor
@@ -34,6 +35,7 @@ from viennatalksbout.lemmy.datasource import LemmyDatasource
 from viennatalksbout.news.rss import RssDatasource
 from viennatalksbout.reddit.datasource import RedditDatasource
 from viennatalksbout.threads.datasource import ThreadsDatasource
+from viennatalksbout.wien_gv.datasource import WienGvPetitionsDatasource
 from viennatalksbout.persistence import PostDatabase
 from viennatalksbout.store import TopicStore
 
@@ -465,10 +467,17 @@ def build_pipeline() -> IngestionPipeline:
             ", ".join(threads_config.keywords),
         )
 
+    # Optionally add Wien.gv.at petitions datasource
+    wien_gv_config = load_wien_gv_config()
+    if wien_gv_config.enabled:
+        wien_gv_ds = WienGvPetitionsDatasource(config=wien_gv_config)
+        datasources.append(wien_gv_ds)
+        logger.info("Wien.gv petitions datasource enabled")
+
     if not datasources:
         raise ValueError(
             "No datasources configured. Enable at least one datasource "
-            "(Mastodon, RSS, Lemmy, Reddit, or Threads)."
+            "(Mastodon, RSS, Lemmy, Reddit, Threads, or Wien.gv)."
         )
 
     if extractor_config.backend == "cli":
