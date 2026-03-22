@@ -16,7 +16,9 @@ tag cloud. Batches are NOT re-queued or merged into the next window.
 
 from __future__ import annotations
 
+import json
 import logging
+import subprocess
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -339,3 +341,159 @@ class TopicExtractor:
             "No record_topics tool use block in response. "
             f"Got content types: {[b.type for b in response.content]}"
         )
+
+
+# Prompt for the CLI backend — asks Claude to return plain JSON instead of
+# using tool use, since the CLI does not support tool_choice.
+_CLI_JSON_INSTRUCTION = (
+    "\n\nRespond with ONLY a JSON object in this exact schema, no other text:\n"
+    '{"topics": [{"topic": "<string>", "score": <number 0-1>, '
+    '"count": <integer>}]}\n'
+    "If no meaningful topics are found, return {\"topics\": []}."
+)
+
+
+class CLITopicExtractor:
+    """Extracts trending topics by invoking the ``claude`` CLI as a subprocess.
+
+    Uses the user's existing Claude subscription instead of API credits.
+    The CLI is invoked with ``--output-format json``, piping the prompt via
+    stdin. The response JSON is parsed into the same ``ExtractedTopic``
+    objects as the SDK backend.
+
+    Args:
+        model: Claude model ID to pass via ``--model`` (optional).
+        max_retries: Maximum retry attempts on failure (0 = no retries).
+        initial_backoff: Initial backoff duration in seconds (doubles each retry).
+    """
+
+    def __init__(
+        self,
+        model: str = DEFAULT_MODEL,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        initial_backoff: float = DEFAULT_INITIAL_BACKOFF,
+    ) -> None:
+        if max_retries < 0:
+            raise ValueError(
+                f"max_retries must be non-negative, got {max_retries}"
+            )
+        if initial_backoff <= 0:
+            raise ValueError(
+                f"initial_backoff must be positive, got {initial_backoff}"
+            )
+
+        self._model = model
+        self._max_retries = max_retries
+        self._initial_backoff = initial_backoff
+
+    @property
+    def model(self) -> str:
+        """The Claude model ID used for extraction."""
+        return self._model
+
+    @property
+    def max_retries(self) -> int:
+        """Maximum retry attempts on CLI failure."""
+        return self._max_retries
+
+    def extract(self, batch: PostBatch) -> list[ExtractedTopic]:
+        """Extract topics from a batch of posts via the claude CLI.
+
+        Args:
+            batch: A PostBatch from the buffer.
+
+        Returns:
+            A list of extracted topics. Returns an empty list if extraction
+            fails after all retries, or if the batch contains no meaningful
+            topics.
+        """
+        if batch.post_count == 0:
+            logger.debug("Empty batch, skipping extraction")
+            return []
+
+        user_message = build_user_message(batch)
+        prompt = SYSTEM_PROMPT + "\n\n" + user_message + _CLI_JSON_INSTRUCTION
+        last_exception: Exception | None = None
+        backoff = self._initial_backoff
+
+        for attempt in range(1 + self._max_retries):
+            try:
+                raw_json = self._call_cli(prompt)
+                parsed = json.loads(raw_json)
+                topics = parse_tool_response(parsed)
+                logger.info(
+                    "Extracted %d topics from %d posts via CLI (attempt %d)",
+                    len(topics),
+                    batch.post_count,
+                    attempt + 1,
+                )
+                return topics
+            except Exception as exc:
+                last_exception = exc
+                if attempt < self._max_retries:
+                    logger.warning(
+                        "CLI error on attempt %d/%d: %s. Retrying in %.1fs...",
+                        attempt + 1,
+                        1 + self._max_retries,
+                        exc,
+                        backoff,
+                    )
+                    time.sleep(backoff)
+                    backoff *= 2
+
+        logger.error(
+            "Topic extraction via CLI failed after %d attempts for batch "
+            "(%d posts, window %s -> %s). Dropping batch. Last error: %s",
+            1 + self._max_retries,
+            batch.post_count,
+            batch.window_start.isoformat(),
+            batch.window_end.isoformat(),
+            last_exception,
+        )
+        return []
+
+    def _call_cli(self, prompt: str) -> str:
+        """Invoke the claude CLI and return the result text.
+
+        Raises:
+            RuntimeError: If the CLI exits with a non-zero status.
+            json.JSONDecodeError: (raised by caller) if output isn't valid JSON.
+        """
+        cmd = ["claude", "--print", "--output-format", "json"]
+        if self._model:
+            cmd.extend(["--model", self._model])
+
+        result = subprocess.run(
+            cmd,
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"claude CLI exited with code {result.returncode}: "
+                f"{result.stderr.strip()}"
+            )
+
+        # The --output-format json wraps the response in a JSON envelope.
+        # Extract the assistant's text from it.
+        try:
+            envelope = json.loads(result.stdout)
+            # The CLI JSON output has a "result" field with the text content.
+            text = envelope.get("result", result.stdout)
+        except json.JSONDecodeError:
+            # If stdout isn't a JSON envelope, use it as-is.
+            text = result.stdout
+
+        # The assistant's text should itself be JSON (our prompt asks for it).
+        # Strip any markdown code fences the model may have wrapped around it.
+        text = text.strip()
+        if text.startswith("```"):
+            # Remove opening fence (possibly ```json)
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[:-3].rstrip()
+
+        return text

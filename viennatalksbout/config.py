@@ -45,18 +45,25 @@ class ExtractorConfig:
     """Configuration for the Claude-based topic extractor.
 
     Attributes:
-        api_key: Anthropic API key.
+        api_key: Anthropic API key (required for ``sdk`` backend only).
         model: Claude model ID (default: Haiku 4.5).
+        backend: Which extraction backend to use: ``"sdk"`` (Anthropic API)
+            or ``"cli"`` (claude CLI subprocess).
     """
 
     api_key: str
     model: str = DEFAULT_EXTRACTOR_MODEL
+    backend: str = "sdk"
 
     def validate(self) -> list[str]:
         """Return a list of validation error messages. Empty list means valid."""
         errors: list[str] = []
-        if not self.api_key:
-            errors.append("ANTHROPIC_API_KEY is required")
+        if self.backend not in ("sdk", "cli"):
+            errors.append(
+                f"EXTRACTOR_BACKEND must be 'sdk' or 'cli', got '{self.backend}'"
+            )
+        if self.backend == "sdk" and not self.api_key:
+            errors.append("ANTHROPIC_API_KEY is required for sdk backend")
         if not self.model:
             errors.append("ANTHROPIC_MODEL must not be empty")
         return errors
@@ -441,6 +448,7 @@ def load_extractor_config(env_path: str | Path | None = None) -> ExtractorConfig
     config = ExtractorConfig(
         api_key=os.environ.get("ANTHROPIC_API_KEY", "").strip(),
         model=os.environ.get("ANTHROPIC_MODEL", DEFAULT_EXTRACTOR_MODEL).strip(),
+        backend=os.environ.get("EXTRACTOR_BACKEND", "sdk").strip().lower(),
     )
 
     errors = config.validate()

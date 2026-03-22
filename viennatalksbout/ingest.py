@@ -25,7 +25,7 @@ from viennatalksbout.config import (
     load_rss_config,
 )
 from viennatalksbout.datasource import BaseDatasource, Post
-from viennatalksbout.extractor import TopicExtractor
+from viennatalksbout.extractor import CLITopicExtractor, TopicExtractor
 from viennatalksbout.health import HealthMonitor
 from viennatalksbout.mastodon.polling import MastodonPollingDatasource
 from viennatalksbout.mastodon.stream import MastodonDatasource
@@ -145,7 +145,7 @@ class IngestionPipeline:
         self,
         datasources: list[BaseDatasource],
         buffer: PostBuffer,
-        extractor: TopicExtractor,
+        extractor: TopicExtractor | CLITopicExtractor,
         store: TopicStore,
         health: HealthMonitor,
         health_log_interval: float = DEFAULT_HEALTH_LOG_INTERVAL,
@@ -444,10 +444,14 @@ def build_pipeline() -> IngestionPipeline:
             "Reddit datasource enabled for r/%s", "+".join(reddit_config.subreddits)
         )
 
-    extractor = TopicExtractor(
-        api_key=extractor_config.api_key,
-        model=extractor_config.model,
-    )
+    if extractor_config.backend == "cli":
+        extractor = CLITopicExtractor(model=extractor_config.model)
+        logger.info("Using CLI subprocess backend for topic extraction")
+    else:
+        extractor = TopicExtractor(
+            api_key=extractor_config.api_key,
+            model=extractor_config.model,
+        )
 
     store = TopicStore(
         snapshot_dir=pipeline_config["snapshot_dir"],
