@@ -205,6 +205,28 @@ class TestLoadMastodonConfigs:
         monkeypatch.setenv("MASTODON_CLIENT_SECRET", "primary_secret")
         monkeypatch.setenv("MASTODON_ACCESS_TOKEN", "primary_token")
 
+    def test_no_instance_url_returns_empty_list(self, monkeypatch: pytest.MonkeyPatch):
+        """No MASTODON_INSTANCE_URL → empty list (Mastodon not configured)."""
+        monkeypatch.delenv("MASTODON_INSTANCE_URL", raising=False)
+        monkeypatch.delenv("MASTODON_CLIENT_ID", raising=False)
+        monkeypatch.delenv("MASTODON_CLIENT_SECRET", raising=False)
+        monkeypatch.delenv("MASTODON_ACCESS_TOKEN", raising=False)
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
+
+        configs = load_mastodon_configs()
+        assert configs == []
+
+    def test_instance_url_with_missing_creds_raises(self, monkeypatch: pytest.MonkeyPatch):
+        """MASTODON_INSTANCE_URL set but creds missing → ValueError."""
+        monkeypatch.setenv("MASTODON_INSTANCE_URL", "https://wien.rocks")
+        monkeypatch.delenv("MASTODON_CLIENT_ID", raising=False)
+        monkeypatch.delenv("MASTODON_CLIENT_SECRET", raising=False)
+        monkeypatch.delenv("MASTODON_ACCESS_TOKEN", raising=False)
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
+
+        with pytest.raises(ValueError, match="Invalid Mastodon configuration"):
+            load_mastodon_configs()
+
     def test_single_instance_returns_one_config(self, monkeypatch: pytest.MonkeyPatch):
         self._set_primary(monkeypatch)
         monkeypatch.delenv("MASTODON_2_INSTANCE_URL", raising=False)

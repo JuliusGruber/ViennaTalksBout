@@ -378,15 +378,24 @@ def build_pipeline() -> IngestionPipeline:
     extractor_config = load_extractor_config()
     pipeline_config = load_pipeline_config()
 
-    instance_names = ", ".join(c.instance_url for c in mastodon_configs)
-    logger.info(
-        "Configuration loaded: instances=%s, model=%s, "
-        "buffer_window=%ds, snapshot_dir=%s",
-        instance_names,
-        extractor_config.model,
-        pipeline_config["buffer_window_seconds"],
-        pipeline_config["snapshot_dir"],
-    )
+    if mastodon_configs:
+        instance_names = ", ".join(c.instance_url for c in mastodon_configs)
+        logger.info(
+            "Configuration loaded: instances=%s, model=%s, "
+            "buffer_window=%ds, snapshot_dir=%s",
+            instance_names,
+            extractor_config.model,
+            pipeline_config["buffer_window_seconds"],
+            pipeline_config["snapshot_dir"],
+        )
+    else:
+        logger.info(
+            "Configuration loaded: no Mastodon instances, model=%s, "
+            "buffer_window=%ds, snapshot_dir=%s",
+            extractor_config.model,
+            pipeline_config["buffer_window_seconds"],
+            pipeline_config["snapshot_dir"],
+        )
 
     db_path = pipeline_config["db_path"]
     db = PostDatabase(db_path) if db_path else None
@@ -442,6 +451,12 @@ def build_pipeline() -> IngestionPipeline:
         datasources.append(reddit_ds)
         logger.info(
             "Reddit datasource enabled for r/%s", "+".join(reddit_config.subreddits)
+        )
+
+    if not datasources:
+        raise ValueError(
+            "No datasources configured. Enable at least one datasource "
+            "(Mastodon, RSS, Lemmy, or Reddit)."
         )
 
     if extractor_config.backend == "cli":

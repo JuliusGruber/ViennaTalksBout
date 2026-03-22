@@ -634,17 +634,22 @@ class TestBuildPipeline:
         assert pipeline is not None
         assert isinstance(pipeline, IngestionPipeline)
 
-    def test_build_pipeline_raises_on_missing_mastodon_config(
+    def test_build_pipeline_raises_on_no_datasources(
         self, monkeypatch: pytest.MonkeyPatch
     ):
+        """No Mastodon, RSS, Lemmy, or Reddit → raises ValueError."""
         monkeypatch.delenv("MASTODON_INSTANCE_URL", raising=False)
         monkeypatch.delenv("MASTODON_CLIENT_ID", raising=False)
         monkeypatch.delenv("MASTODON_CLIENT_SECRET", raising=False)
         monkeypatch.delenv("MASTODON_ACCESS_TOKEN", raising=False)
+        monkeypatch.delenv("RSS_ENABLED", raising=False)
+        monkeypatch.delenv("LEMMY_ENABLED", raising=False)
+        monkeypatch.delenv("REDDIT_ENABLED", raising=False)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
         # Prevent load_dotenv from re-loading the real .env file
         monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
 
-        with pytest.raises(ValueError, match="Invalid Mastodon configuration"):
+        with pytest.raises(ValueError, match="No datasources configured"):
             build_pipeline()
 
     def test_build_pipeline_raises_on_missing_extractor_config(
@@ -1067,3 +1072,24 @@ class TestBuildPipelineRss:
         assert len(pipeline._datasources) == 2
         assert isinstance(pipeline._datasources[0], MastodonDatasource)
         assert isinstance(pipeline._datasources[1], RssDatasource)
+
+    def test_build_pipeline_rss_only_no_mastodon(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """RSS enabled with no Mastodon should work (only RSS datasource)."""
+        from viennatalksbout.news.rss import RssDatasource
+
+        monkeypatch.delenv("MASTODON_INSTANCE_URL", raising=False)
+        monkeypatch.delenv("MASTODON_CLIENT_ID", raising=False)
+        monkeypatch.delenv("MASTODON_CLIENT_SECRET", raising=False)
+        monkeypatch.delenv("MASTODON_ACCESS_TOKEN", raising=False)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+        monkeypatch.setenv("VIENNATALKSBOUT_SNAPSHOT_DIR", str(tmp_path / "snapshots"))
+        monkeypatch.setenv("RSS_ENABLED", "true")
+        monkeypatch.setattr("viennatalksbout.config.load_dotenv", lambda *a, **kw: None)
+
+        with patch("viennatalksbout.extractor.anthropic.Anthropic"):
+            pipeline = build_pipeline()
+
+        assert len(pipeline._datasources) == 1
+        assert isinstance(pipeline._datasources[0], RssDatasource)

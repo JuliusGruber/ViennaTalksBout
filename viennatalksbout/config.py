@@ -386,17 +386,44 @@ def load_mastodon_configs(
     Additional instances use numbered prefixes: ``MASTODON_2_*``,
     ``MASTODON_3_*``, etc.
 
+    If no primary ``MASTODON_INSTANCE_URL`` is set, returns an empty list
+    (Mastodon is not configured). This allows running the pipeline with
+    only other datasources (RSS, Lemmy, Reddit).
+
     Args:
         env_path: Optional path to a .env file.
 
     Returns:
-        A list of validated MastodonConfig instances (at least one).
+        A list of validated MastodonConfig instances (may be empty).
 
     Raises:
-        ValueError: If the primary config is invalid, or if any numbered
-            instance has a partial configuration.
+        ValueError: If a Mastodon instance URL is set but the remaining
+            credentials are missing or invalid.
     """
-    primary = load_config(env_path)
+    if env_path is not None:
+        load_dotenv(env_path, override=True)
+    else:
+        load_dotenv(override=True)
+
+    # If no primary instance URL is set, Mastodon is not configured
+    primary_url = os.environ.get("MASTODON_INSTANCE_URL", "").strip()
+    if not primary_url:
+        return []
+
+    primary = MastodonConfig(
+        instance_url=primary_url,
+        client_id=os.environ.get("MASTODON_CLIENT_ID", "").strip(),
+        client_secret=os.environ.get("MASTODON_CLIENT_SECRET", "").strip(),
+        access_token=os.environ.get("MASTODON_ACCESS_TOKEN", "").strip(),
+    )
+
+    errors = primary.validate()
+    if errors:
+        raise ValueError(
+            "Invalid Mastodon configuration:\n"
+            + "\n".join(f"  - {e}" for e in errors)
+        )
+
     configs = [primary]
 
     # Scan for numbered instances (MASTODON_2_*, MASTODON_3_*, …)
