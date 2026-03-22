@@ -103,6 +103,11 @@ class TestIndexEndpoint:
         resp = client.get("/")
         assert "tag-cloud" in resp.text
 
+    def test_contains_health_warning_element(self):
+        client = _make_client()
+        resp = client.get("/")
+        assert "health-warning" in resp.text
+
 
 # ===========================================================================
 # GET /api/topics

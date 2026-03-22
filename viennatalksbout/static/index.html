@@ -122,6 +122,26 @@
     font-style: italic;
     font-size: 1rem;
   }
+
+  #health-warning {
+    display: none;
+    text-align: center;
+    color: #b71c1c;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    line-height: 1.5;
+  }
+
+  #health-warning .warn-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.2rem;
+  }
+
+  #health-warning .warn-detail {
+    color: #5a7da0;
+    font-size: 0.8rem;
+  }
 </style>
 </head>
 <body>
@@ -133,6 +153,7 @@
 
 <div id="tag-cloud">
   <span id="empty-msg">Waiting for topics&hellip;</span>
+  <div id="health-warning"></div>
 </div>
 
 <footer>
@@ -148,6 +169,8 @@
   const slider = document.getElementById('time-slider');
   const sliderLabel = document.getElementById('slider-label');
   const healthDot = document.getElementById('health-dot');
+
+  const healthWarning = document.getElementById('health-warning');
 
   const currentTopics = new Map();
   let isLive = true;
@@ -222,6 +245,7 @@
     currentTopics.clear();
     cloud.querySelectorAll('.topic').forEach(function (el) { el.remove(); });
     if (emptyMsg) emptyMsg.style.display = '';
+    if (healthWarning) healthWarning.style.display = 'none';
   }
 
   async function fetchTopics(hour) {
@@ -232,6 +256,31 @@
     var resp = await fetch(url);
     if (!resp.ok) return [];
     return await resp.json();
+  }
+
+  function updateHealthWarning(health) {
+    if (!healthWarning) return;
+    // Show warning when there are batch failures and no topics are displaying
+    var hasFailures = health && health.batches_failed > 0;
+    var noTopics = currentTopics.size === 0;
+
+    if (hasFailures && noTopics) {
+      var rate = Math.round(health.llm_success_rate * 100);
+      var lines = '<div class="warn-title">Topic extraction is failing</div>';
+      lines += '<div class="warn-detail">';
+      lines += rate + '% success rate &middot; ';
+      lines += health.batches_failed + ' batch' + (health.batches_failed !== 1 ? 'es' : '') + ' failed';
+      if (health.batches_processed > 0) {
+        lines += ' &middot; ' + health.batches_processed + ' succeeded';
+      }
+      lines += '</div>';
+      healthWarning.innerHTML = lines;
+      healthWarning.style.display = '';
+      // Replace the generic empty message with context
+      if (emptyMsg) emptyMsg.style.display = 'none';
+    } else {
+      healthWarning.style.display = 'none';
+    }
   }
 
   async function fetchHealth() {
@@ -251,11 +300,9 @@
       renderTopics(topics);
       var health = await fetchHealth();
       if (health) {
-        healthDot.className = health.stream_stale ? 'stale' : 'ok';
-        healthDot.className = 'health-dot ' + (health.stream_stale ? 'stale' : 'ok');
-        // Use id-based styling
         healthDot.classList.remove('ok', 'stale');
         healthDot.classList.add(health.stream_stale ? 'stale' : 'ok');
+        updateHealthWarning(health);
       }
     } catch (e) {
       console.error('Poll error:', e);
