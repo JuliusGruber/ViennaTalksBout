@@ -18,11 +18,13 @@ from types import FrameType
 
 from viennatalksbout.buffer import PostBatch, PostBuffer
 from viennatalksbout.config import (
+    load_bluesky_config,
     load_extractor_config,
     load_lemmy_configs,
     load_mastodon_configs,
     load_reddit_config,
     load_rss_config,
+    load_threads_config,
     load_wien_gv_config,
 )
 from viennatalksbout.datasource import BaseDatasource, Post
@@ -30,9 +32,11 @@ from viennatalksbout.extractor import CLITopicExtractor, TopicExtractor
 from viennatalksbout.health import HealthMonitor
 from viennatalksbout.mastodon.polling import MastodonPollingDatasource
 from viennatalksbout.mastodon.stream import MastodonDatasource
+from viennatalksbout.bluesky.datasource import BlueskyDatasource
 from viennatalksbout.lemmy.datasource import LemmyDatasource
 from viennatalksbout.news.rss import RssDatasource
 from viennatalksbout.reddit.datasource import RedditDatasource
+from viennatalksbout.threads.datasource import ThreadsDatasource
 from viennatalksbout.wien_gv.datasource import WienGvPetitionsDatasource
 from viennatalksbout.persistence import PostDatabase
 from viennatalksbout.store import TopicStore
@@ -455,6 +459,16 @@ def build_pipeline() -> IngestionPipeline:
             "Reddit datasource enabled for r/%s", "+".join(reddit_config.subreddits)
         )
 
+    # Optionally add Threads datasource
+    threads_config = load_threads_config()
+    if threads_config.enabled:
+        threads_ds = ThreadsDatasource(config=threads_config)
+        datasources.append(threads_ds)
+        logger.info(
+            "Threads datasource enabled for keywords: %s",
+            ", ".join(threads_config.keywords),
+        )
+
     # Optionally add Wien.gv.at petitions datasource
     wien_gv_config = load_wien_gv_config()
     if wien_gv_config.enabled:
@@ -462,10 +476,20 @@ def build_pipeline() -> IngestionPipeline:
         datasources.append(wien_gv_ds)
         logger.info("Wien.gv petitions datasource enabled")
 
+    # Optionally add Bluesky datasource
+    bluesky_config = load_bluesky_config()
+    if bluesky_config.enabled:
+        bluesky_ds = BlueskyDatasource(config=bluesky_config)
+        datasources.append(bluesky_ds)
+        logger.info(
+            "Bluesky datasource enabled for queries: %s",
+            ", ".join(bluesky_config.search_queries),
+        )
+
     if not datasources:
         raise ValueError(
             "No datasources configured. Enable at least one datasource "
-            "(Mastodon, RSS, Lemmy, Reddit, or Wien.gv)."
+            "(Mastodon, RSS, Lemmy, Reddit, Threads, Wien.gv, or Bluesky)."
         )
 
     if extractor_config.backend == "cli":
