@@ -125,6 +125,10 @@ DEFAULT_RSS_FEEDS = (
     ("https://rss.orf.at/news.xml", "orf-news"),
     ("http://www.vienna.at/rss", "vienna-at"),
     ("https://www.ots.at/rss/index", "ots"),
+    ("https://www.falter.at/rss", "falter"),
+    ("https://www.1000thingsmagazine.com/feed/", "1000things"),
+    ("https://www.stadtbekannt.at/feed/", "stadtbekannt"),
+    ("https://www.derstandard.at/rss", "derstandard"),
 )
 
 
