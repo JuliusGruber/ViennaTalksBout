@@ -18,6 +18,7 @@ from viennatalksbout.extractor import (
     SYSTEM_PROMPT,
     ExtractedTopic,
     TopicExtractor,
+    _is_retryable_api_error,
     build_user_message,
     parse_tool_response,
 )
@@ -84,9 +85,20 @@ def _make_response(content_blocks: list) -> MagicMock:
 
 
 def _make_api_error(message: str = "API error") -> anthropic.APIConnectionError:
-    """Create an anthropic API error for testing."""
+    """Create an anthropic API connection error for testing (retryable)."""
     request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
     return anthropic.APIConnectionError(request=request, message=message)
+
+
+def _make_status_error(
+    status_code: int, message: str = "API error"
+) -> anthropic.APIStatusError:
+    """Create an anthropic API status error with a given HTTP status code."""
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    response = httpx.Response(status_code, request=request)
+    return anthropic.APIStatusError(
+        message=message, response=response, body=None
+    )
 
 
 # ===========================================================================
@@ -751,3 +763,148 @@ class TestConstants:
 
     def test_default_model_is_haiku(self):
         assert "haiku" in DEFAULT_MODEL
+
+
+# ===========================================================================
+# _is_retryable_api_error
+# ===========================================================================
+
+
+class TestIsRetryableApiError:
+    """Tests for the _is_retryable_api_error helper."""
+
+    def test_connection_error_is_retryable(self):
+        err = _make_api_error("connection refused")
+        assert _is_retryable_api_error(err) is True
+
+    def test_timeout_error_is_retryable(self):
+        request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+        err = anthropic.APITimeoutError(request=request)
+        assert _is_retryable_api_error(err) is True
+
+    def test_429_rate_limit_is_retryable(self):
+        err = _make_status_error(429, "rate limited")
+        assert _is_retryable_api_error(err) is True
+
+    def test_500_server_error_is_retryable(self):
+        err = _make_status_error(500, "internal server error")
+        assert _is_retryable_api_error(err) is True
+
+    def test_502_bad_gateway_is_retryable(self):
+        err = _make_status_error(502, "bad gateway")
+        assert _is_retryable_api_error(err) is True
+
+    def test_503_service_unavailable_is_retryable(self):
+        err = _make_status_error(503, "service unavailable")
+        assert _is_retryable_api_error(err) is True
+
+    def test_400_bad_request_not_retryable(self):
+        err = _make_status_error(400, "credit balance too low")
+        assert _is_retryable_api_error(err) is False
+
+    def test_401_unauthorized_not_retryable(self):
+        err = _make_status_error(401, "invalid api key")
+        assert _is_retryable_api_error(err) is False
+
+    def test_403_forbidden_not_retryable(self):
+        err = _make_status_error(403, "permission denied")
+        assert _is_retryable_api_error(err) is False
+
+    def test_404_not_found_not_retryable(self):
+        err = _make_status_error(404, "not found")
+        assert _is_retryable_api_error(err) is False
+
+    def test_422_unprocessable_not_retryable(self):
+        err = _make_status_error(422, "unprocessable entity")
+        assert _is_retryable_api_error(err) is False
+
+
+# ===========================================================================
+# TopicExtractor.extract — non-retryable error handling
+# ===========================================================================
+
+
+@patch("viennatalksbout.extractor.time.sleep")
+@patch("viennatalksbout.extractor.anthropic.Anthropic")
+class TestTopicExtractorNonRetryable:
+    """Tests that non-retryable API errors fail fast without retries."""
+
+    def test_400_billing_error_fails_fast(self, mock_cls, mock_sleep):
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+
+        error = _make_status_error(400, "credit balance too low")
+        mock_client.messages.create.side_effect = error
+
+        ext = TopicExtractor(
+            api_key="test-key", max_retries=3, initial_backoff=1.0
+        )
+        batch = _make_batch([_make_post()])
+        topics = ext.extract(batch)
+
+        assert topics == []
+        assert mock_client.messages.create.call_count == 1
+        mock_sleep.assert_not_called()
+
+    def test_401_auth_error_fails_fast(self, mock_cls, mock_sleep):
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+
+        error = _make_status_error(401, "invalid api key")
+        mock_client.messages.create.side_effect = error
+
+        ext = TopicExtractor(
+            api_key="test-key", max_retries=3, initial_backoff=1.0
+        )
+        batch = _make_batch([_make_post()])
+        topics = ext.extract(batch)
+
+        assert topics == []
+        assert mock_client.messages.create.call_count == 1
+        mock_sleep.assert_not_called()
+
+    def test_429_rate_limit_is_retried(self, mock_cls, mock_sleep):
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+
+        error = _make_status_error(429, "rate limited")
+        tool_block = _make_tool_use_block([
+            {"topic": "Test", "score": 0.5, "count": 1},
+        ])
+        mock_client.messages.create.side_effect = [
+            error,
+            _make_response([tool_block]),
+        ]
+
+        ext = TopicExtractor(
+            api_key="test-key", max_retries=2, initial_backoff=1.0
+        )
+        batch = _make_batch([_make_post()])
+        topics = ext.extract(batch)
+
+        assert len(topics) == 1
+        assert mock_client.messages.create.call_count == 2
+        mock_sleep.assert_called_once_with(1.0)
+
+    def test_500_server_error_is_retried(self, mock_cls, mock_sleep):
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+
+        error = _make_status_error(500, "internal server error")
+        tool_block = _make_tool_use_block([
+            {"topic": "Test", "score": 0.5, "count": 1},
+        ])
+        mock_client.messages.create.side_effect = [
+            error,
+            _make_response([tool_block]),
+        ]
+
+        ext = TopicExtractor(
+            api_key="test-key", max_retries=2, initial_backoff=1.0
+        )
+        batch = _make_batch([_make_post()])
+        topics = ext.extract(batch)
+
+        assert len(topics) == 1
+        assert mock_client.messages.create.call_count == 2
+        mock_sleep.assert_called_once_with(1.0)

@@ -112,6 +112,18 @@ class ExtractedTopic:
     count: int
 
 
+def _is_retryable_api_error(exc: anthropic.APIError) -> bool:
+    """Check whether an API error is worth retrying.
+
+    Retryable: network errors, 429 (rate limit), 5xx (server errors).
+    Non-retryable: 4xx errors (except 429) — e.g. 400 billing, 401 auth, 403 permission.
+    """
+    if isinstance(exc, anthropic.APIStatusError):
+        return exc.status_code == 429 or exc.status_code >= 500
+    # APIConnectionError, APITimeoutError — network issues, always retry
+    return True
+
+
 def build_user_message(batch: PostBatch) -> str:
     """Build the user message content from a PostBatch.
 
@@ -278,6 +290,15 @@ class TopicExtractor:
                 return topics
             except anthropic.APIError as exc:
                 last_exception = exc
+                if not _is_retryable_api_error(exc):
+                    logger.error(
+                        "Non-retryable API error (status %s): %s. "
+                        "Dropping batch (%d posts).",
+                        getattr(exc, "status_code", "N/A"),
+                        exc,
+                        batch.post_count,
+                    )
+                    return []
                 if attempt < self._max_retries:
                     logger.warning(
                         "API error on attempt %d/%d: %s. Retrying in %.1fs...",
