@@ -23,6 +23,7 @@ from viennatalksbout.config import (
     load_mastodon_configs,
     load_reddit_config,
     load_rss_config,
+    load_threads_config,
 )
 from viennatalksbout.datasource import BaseDatasource, Post
 from viennatalksbout.extractor import CLITopicExtractor, TopicExtractor
@@ -32,6 +33,7 @@ from viennatalksbout.mastodon.stream import MastodonDatasource
 from viennatalksbout.lemmy.datasource import LemmyDatasource
 from viennatalksbout.news.rss import RssDatasource
 from viennatalksbout.reddit.datasource import RedditDatasource
+from viennatalksbout.threads.datasource import ThreadsDatasource
 from viennatalksbout.persistence import PostDatabase
 from viennatalksbout.store import TopicStore
 
@@ -453,10 +455,20 @@ def build_pipeline() -> IngestionPipeline:
             "Reddit datasource enabled for r/%s", "+".join(reddit_config.subreddits)
         )
 
+    # Optionally add Threads datasource
+    threads_config = load_threads_config()
+    if threads_config.enabled:
+        threads_ds = ThreadsDatasource(config=threads_config)
+        datasources.append(threads_ds)
+        logger.info(
+            "Threads datasource enabled for keywords: %s",
+            ", ".join(threads_config.keywords),
+        )
+
     if not datasources:
         raise ValueError(
             "No datasources configured. Enable at least one datasource "
-            "(Mastodon, RSS, Lemmy, or Reddit)."
+            "(Mastodon, RSS, Lemmy, Reddit, or Threads)."
         )
 
     if extractor_config.backend == "cli":

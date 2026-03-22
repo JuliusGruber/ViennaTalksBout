@@ -203,6 +203,82 @@ class LemmyConfig:
         return errors
 
 
+@dataclass(frozen=True)
+class ThreadsConfig:
+    """Configuration for the Threads datasource.
+
+    Attributes:
+        access_token: Meta API access token (long-lived).
+        keywords: Tuple of keywords to search for.
+        poll_interval: Seconds between poll cycles.
+        user_agent: User-Agent header for HTTP requests.
+        enabled: Whether the Threads datasource is active.
+    """
+
+    access_token: str
+    keywords: tuple[str, ...] = ("wien", "vienna")
+    poll_interval: int = 300
+    user_agent: str = "ViennaTalksBout/1.0"
+    enabled: bool = False
+
+    def validate(self) -> list[str]:
+        """Return a list of validation error messages. Empty list means valid."""
+        errors: list[str] = []
+        if not self.enabled:
+            return errors
+        if not self.access_token:
+            errors.append("THREADS_ACCESS_TOKEN is required")
+        if not self.keywords:
+            errors.append(
+                "THREADS_KEYWORDS must not be empty when Threads is enabled"
+            )
+        if self.poll_interval <= 0:
+            errors.append("THREADS_POLL_INTERVAL must be positive")
+        return errors
+
+
+def load_threads_config() -> ThreadsConfig:
+    """Load Threads datasource configuration from environment variables.
+
+    Environment variables:
+        THREADS_ENABLED: "true" to enable (default "false").
+        THREADS_ACCESS_TOKEN: Meta API access token.
+        THREADS_KEYWORDS: Comma-separated keywords (default "wien,vienna").
+        THREADS_POLL_INTERVAL: Seconds between polls (default 300).
+        THREADS_USER_AGENT: User-Agent header (default "ViennaTalksBout/1.0").
+
+    Returns:
+        A ThreadsConfig instance.
+
+    Raises:
+        ValueError: If the configuration is invalid when enabled.
+    """
+    enabled = os.environ.get("THREADS_ENABLED", "false").strip().lower() == "true"
+
+    keywords_raw = os.environ.get("THREADS_KEYWORDS", "wien,vienna").strip()
+    keywords = tuple(k.strip() for k in keywords_raw.split(",") if k.strip())
+
+    poll_interval = int(os.environ.get("THREADS_POLL_INTERVAL", "300").strip())
+    user_agent = os.environ.get("THREADS_USER_AGENT", "ViennaTalksBout/1.0").strip()
+
+    config = ThreadsConfig(
+        access_token=os.environ.get("THREADS_ACCESS_TOKEN", "").strip(),
+        keywords=keywords,
+        poll_interval=poll_interval,
+        user_agent=user_agent,
+        enabled=enabled,
+    )
+
+    errors = config.validate()
+    if errors:
+        raise ValueError(
+            "Invalid Threads configuration:\n"
+            + "\n".join(f"  - {e}" for e in errors)
+        )
+
+    return config
+
+
 def load_lemmy_config() -> LemmyConfig:
     """Load Lemmy datasource configuration from environment variables.
 
